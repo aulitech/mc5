@@ -1,18 +1,36 @@
-import React, { useState, useRef } from "react";
-import Keyboard from "react-simple-keyboard";
+import { useState, useRef } from "react";
+import Keyboard, { type SimpleKeyboard } from "react-simple-keyboard";
 import "./KeyboardModal.css";
 
-const KeyboardModal = ({ onPress }) => {
+interface KeyboardModalProps {
+  /** Called with the held modifiers, plus the pressed key last (if any). */
+  onPress: (keys: string[]) => void;
+}
+
+const SHIFT_KEYS = ["{shift}", "{shiftleft}", "{shiftright}", "{capslock}"];
+const MODIFIER_KEYS = [
+  ...SHIFT_KEYS,
+  "{control}",
+  "{alt}",
+  "{meta}",
+  "{controlleft}",
+  "{controlright}",
+  "{altleft}",
+  "{altright}",
+  "{metaleft}",
+  "{metaright}",
+];
+
+const KeyboardModal = ({ onPress }: KeyboardModalProps) => {
   const [state, setState] = useState({
     layoutName: "default",
     capsLock: false,
   });
-  const modifiers = useRef([]);
-  let keyboard = useRef();
+  const modifiers = useRef<string[]>([]);
+  const keyboard = useRef<SimpleKeyboard | null>(null);
 
   const commonKeyboardOptions = {
-    onChange: (input) => onChange(input),
-    onKeyPress: (button) => onKeyPress(button),
+    onKeyPress: (button: string) => onKeyPress(button),
     theme: "simple-keyboard hg-theme-default hg-layout-default",
     physicalKeyboardHighlight: true,
     syncInstanceInputs: true,
@@ -103,27 +121,8 @@ const KeyboardModal = ({ onPress }) => {
     },
   };
 
-  const onChange = (input) => {
-    console.log("onChange:", input);
-    //setInput(input);
-  };
-
-  const onKeyPress = (button) => {
-    const shiftKeys = ["{shift}", "{shiftleft}", "{shiftright}", "{capslock}"];
-    const modifierKeys = [
-      ...shiftKeys,
-      "{control}",
-      "{alt}",
-      "{meta}",
-      "{controlleft}",
-      "{controlright}",
-      "{altleft}",
-      "{altright}",
-      "{metaleft}",
-      "{metaright}",
-    ];
-
-    if (modifierKeys.includes(button)) {
+  const onKeyPress = (button: string) => {
+    if (MODIFIER_KEYS.includes(button)) {
       if (modifiers.current.includes(button)) {
         modifiers.current = modifiers.current.filter((mod) => mod !== button);
         keyboard.current?.removeButtonTheme(button, "hg-selectedButton");
@@ -131,25 +130,20 @@ const KeyboardModal = ({ onPress }) => {
         modifiers.current.push(button);
         keyboard.current?.addButtonTheme(button, "hg-selectedButton");
       }
-      if (shiftKeys.includes(button)) {
-        setState({
-          layoutName: state.layoutName === "default" ? "shift" : "default",
-          capsLock: button === "{capslock}" ? !state.capsLock : state.capsLock,
-        });
+      if (SHIFT_KEYS.includes(button)) {
+        setState((prev) => ({
+          layoutName: prev.layoutName === "default" ? "shift" : "default",
+          capsLock: button === "{capslock}" ? !prev.capsLock : prev.capsLock,
+        }));
       }
-      console.log(`${modifiers.current.join(" ")}`);
       onPress([...modifiers.current]); // Send modifiers as input
-
     } else {
-      // For non-modifier keys, log the button and active modifiers
-      //console.log("Button:", modifiers.current, button);
-      console.log(`${modifiers.current.join(" ")} ${button}`);
       onPress([...modifiers.current, button.toLowerCase()]); // Send modifiers and key as input
       modifiers.current.forEach((mod) => {
         keyboard.current?.removeButtonTheme(mod, "hg-selectedButton");
       });
       modifiers.current = []; // Clear modifiers after save
-      if (!state.capsLock) setState({ layoutName: "default" });
+      setState((prev) => (prev.capsLock ? prev : { ...prev, layoutName: "default" }));
     }
   };
 
@@ -158,7 +152,7 @@ const KeyboardModal = ({ onPress }) => {
       <div className="keyboardContainer">
         <Keyboard
           baseClass="simple-keyboard-main"
-          keyboardRef={(r) => (keyboard.current = r)}
+          keyboardRef={(r: SimpleKeyboard) => (keyboard.current = r)}
           layoutName={state.layoutName}
           {...keyboardOptions}
         />

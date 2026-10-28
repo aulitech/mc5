@@ -93,11 +93,13 @@ function GestureSummary() {
                   onChange={() => store.toggleClass(name)}
                   onClick={(e) => e.stopPropagation()}
                   title="Select for template generation"
+                  aria-label={`Include ${name} in the next model`}
                 />
                 <button
                   className={styles.btnDanger}
                   onClick={(e) => handleDeleteClass(e, name)}
                   title={`Delete all "${name}" recordings`}
+                  aria-label={`Delete all "${name}" recordings`}
                 >
                   ×
                 </button>
@@ -105,11 +107,21 @@ function GestureSummary() {
                   className={styles.btnView}
                   onClick={(e) => handleRenameClass(e, name)}
                   title={`Rename "${name}"`}
+                  aria-label={`Rename "${name}"`}
                 >
                   ✎
                 </button>
                 <span className={styles.gestureCount}>{count}</span>
-                <span className={styles.gestureName}>{name}</span>
+                <button
+                  className={`btn-plain ${styles.gestureName}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleClassClick(name);
+                  }}
+                  aria-expanded={expandedClasses.has(name)}
+                >
+                  {name}
+                </button>
               </div>
 
               {/* ── Expanded recordings list ── */}
@@ -124,11 +136,21 @@ function GestureSummary() {
                       onClick={() => store.selectRecording(rec)}
                       title="Click to visualize this recording"
                     >
-                      <span className={styles.recordingMeta}>{fmtTime(rec.timestamp)}</span>
+                      <button
+                        className={`btn-plain ${styles.recordingMeta}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          store.selectRecording(rec);
+                        }}
+                        aria-pressed={selection?.kind === "recording" && selection.id === rec.id}
+                      >
+                        {fmtTime(rec.timestamp)}
+                      </button>
                       <button
                         className={styles.btnDanger}
                         onClick={(e) => handleDeleteRecording(e, rec)}
                         title="Delete this recording"
+                        aria-label={`Delete recording from ${fmtTime(rec.timestamp)}`}
                       >
                         ×
                       </button>
@@ -159,8 +181,18 @@ function GestureSummary() {
                 onChange={() => store.toggleStandard(g.id)}
                 onClick={(e) => e.stopPropagation()}
                 title="Select for template generation"
+                aria-label={`Include ${g.label} in the next model`}
               />
-              <span className={styles.gestureName}>{g.label}</span>
+              <button
+                className={`btn-plain ${styles.gestureName}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  store.selectStandard(g.id);
+                }}
+                aria-pressed={selection?.kind === "standard" && selection.id === g.id}
+              >
+                {g.label}
+              </button>
             </div>
           </li>
         ))}

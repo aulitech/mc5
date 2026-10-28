@@ -24,7 +24,9 @@ interface GestureControlProps {
 function GestureControl({ gestureName, isStreaming }: GestureControlProps) {
   const { addRecording } = useGestureStore();
   const recorder = useSensorRecorder(RECORD_MS);
-  const [captured, setCaptured] = useState<Sample[] | null>(null);
+  // The last recording, awaiting Accept/Reject — with the name it was
+  // recorded under, so changing the name meanwhile doesn't relabel it.
+  const [captured, setCaptured] = useState<{ name: string; samples: Sample[] } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(false);
   const [autoStartPending, setAutoStartPending] = useState(false);
@@ -35,21 +37,23 @@ function GestureControl({ gestureName, isStreaming }: GestureControlProps) {
 
   const handleRecord = async () => {
     if (!canRecord) return;
+    const recordedAs = name;
     const samples = await recorder.record();
     console.log(`[GestureControl] captured ${samples.length} samples`);
     if (samples.length === 0) {
       notify.error("No sensor data arrived during the recording. Check that Cato is connected and try again.");
       return;
     }
-    setCaptured(samples);
+    setCaptured({ name: recordedAs, samples });
   };
 
   const handleAccept = async () => {
     if (!captured) return;
     setIsSaving(true);
-    await addRecording(name, captured);
-    setCaptured(null);
+    const saved = await addRecording(captured.name, captured.samples);
     setIsSaving(false);
+    if (!saved) return; // keep the capture so Accept can be retried
+    setCaptured(null);
     if (autoAdvance) setAutoStartPending(true);
   };
 
@@ -74,11 +78,24 @@ function GestureControl({ gestureName, isStreaming }: GestureControlProps) {
   return (
     <div className={styles.gestureControl}>
       {isSaving && <p className={styles.savingMsg}>Saving…</p>}
+      {captured && !isSaving && (
+        <p className={styles.savingMsg}>
+          Recorded "{captured.name}" ({captured.samples.length} samples) — accept or reject.
+        </p>
+      )}
 
       {/* Progress bar — gradient track (red|green|red) with elapsed cover */}
       <div className={styles.progressBarContainer}>
         <div className={styles.progressBarWrap}>
-          <div className={styles.progressElapsed} style={{ width: `${recorder.progress * 100}%` }} />
+          <div
+            className={styles.progressElapsed}
+            style={{ width: `${recorder.progress * 100}%` }}
+            role="progressbar"
+            aria-label="Recording progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(recorder.progress * 100)}
+          />
         </div>
         <span className={styles.labelStart}>Start Gesture</span>
         <span className={styles.labelEnd}>End Gesture</span>

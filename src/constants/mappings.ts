@@ -1,8 +1,19 @@
-// =============================================================================
-// 1. CONSTANTS, MAPPINGS & SCHEMA
-// =============================================================================
+// mappings.ts — Option lists and code tables for action editing and the
+// config tree.
 
-export const ORIENTATION_OPTS = [
+export interface Option<V extends string | number = string | number> {
+  value: V;
+  label: string;
+}
+
+export interface Modifier {
+  /** react-simple-keyboard button name, e.g. "{shiftleft}". */
+  label: string;
+  /** Bit in the HID modifier byte. */
+  mask: number;
+}
+
+export const ORIENTATION_OPTS: Option<string>[] = [
   { value: "u", label: "Up" },
   { value: "d", label: "Down" },
   { value: "l", label: "Left" },
@@ -11,13 +22,12 @@ export const ORIENTATION_OPTS = [
   { value: "b", label: "Back" },
 ];
 
-export const DEVICE_TYPES = [
+export const DEVICE_TYPES: Option<number>[] = [
   { value: 0, label: "Mouse" },
   { value: 1, label: "Keyboard" },
 ];
 
-
-export const MOUSE_OPTS = [
+export const MOUSE_OPTS: Option<number>[] = [
   { value: 0, label: "No Button" },
   { value: 1, label: "Left Click" },
   { value: 2, label: "Right Click" },
@@ -26,7 +36,7 @@ export const MOUSE_OPTS = [
   { value: 5, label: "Side Button 2 (Forward)" },
 ];
 
-export const MODIFIERS = [
+export const MODIFIERS: Modifier[] = [
   { label: "{controlleft}", mask: 1 },
   { label: "{shiftleft}", mask: 2 },
   { label: "{altleft}", mask: 4 },
@@ -37,7 +47,8 @@ export const MODIFIERS = [
   { label: "{metaright}", mask: 128 },
 ];
 
-export const KEY_TO_HID = {
+/** Keyboard key (react-simple-keyboard name) → HID usage code. */
+export const KEY_TO_HID: Record<string, number> = {
   "No key": 0,
   a: 4,
   b: 5,
@@ -118,7 +129,7 @@ export const KEY_TO_HID = {
   "{rightmeta}": 231,
 };
 
-export const BUTTON_ACTIONS = [
+export const BUTTON_ACTIONS: Option<string>[] = [
   { value: "tap", label: "Tap" },
   { value: "double_tap", label: "Double Tap" },
   { value: "press", label: "Press" },
@@ -126,14 +137,10 @@ export const BUTTON_ACTIONS = [
   { value: "toggle", label: "Toggle" },
   { value: "hold_until_idle", label: "Hold Until Idle" },
 ];
-export const SCROLL_TYPES = [
-	{ value: "fixed", label: "Fixed" },
-	{ value: "classic", label: "Classic" },
-	{ value: "toggle", label: "Toggle" },
-	{ value: "until_idle", label: "Until Idle" }
-];
-export const AXIS_OPTS = [
-	{ value: "yaw", label: "Yaw" },
-	{ value: "pitch", label: "Pitch" },
-	{ value: "roll", label: "Roll" }
+
+export const SCROLL_TYPES: Option<string>[] = [
+  { value: "fixed", label: "Fixed" },
+  { value: "classic", label: "Classic" },
+  { value: "toggle", label: "Toggle" },
+  { value: "until_idle", label: "Until Idle" },
 ];

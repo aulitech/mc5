@@ -74,6 +74,16 @@ function promisify<T>(request: IDBRequest<T>): Promise<T> {
   });
 }
 
+// Resolves once a readwrite transaction has committed (or rejects if it
+// aborts) — a request's own success only means it was queued.
+function txDone(tx: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
 // Runs fn on every recording filed under gestureName, in one readwrite
 // transaction. Resolves once the transaction has committed.
 async function forEachInGesture(
@@ -83,20 +93,16 @@ async function forEachInGesture(
   const db = await openDB();
   const tx = db.transaction(STORE_RECORDINGS, "readwrite");
   const index = tx.objectStore(STORE_RECORDINGS).index("gestureName");
-  return new Promise((resolve, reject) => {
-    // openCursor iterates over every record matching the index key.
-    const request = index.openCursor(gestureName);
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (cursor) {
-        fn(cursor);
-        cursor.continue(); // move to next matching record
-      }
-    };
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
+  // openCursor iterates over every record matching the index key.
+  const request = index.openCursor(gestureName);
+  request.onsuccess = () => {
+    const cursor = request.result;
+    if (cursor) {
+      fn(cursor);
+      cursor.continue(); // move to next matching record
+    }
+  };
+  return txDone(tx);
 }
 
 // ─── Recordings ───────────────────────────────────────────────────────────────
@@ -116,7 +122,10 @@ export async function saveRecording(gestureName: string, data: Sample[]): Promis
     timestamp: new Date().toISOString(),
     data,
   };
-  return (await promisify(store.add(record))) as number;
+  const done = txDone(tx);
+  const id = (await promisify(store.add(record))) as number;
+  await done;
+  return id;
 }
 
 /**
@@ -135,11 +144,23 @@ export async function getRecordingsForGesture(gestureName: string): Promise<Reco
 export async function getGestureCounts(): Promise<Record<string, number>> {
   const db = await openDB();
   const tx = db.transaction(STORE_RECORDINGS, "readonly");
-  const all: Recording[] = await promisify(tx.objectStore(STORE_RECORDINGS).getAll());
-  return all.reduce<Record<string, number>>((counts, record) => {
-    counts[record.gestureName] = (counts[record.gestureName] || 0) + 1;
-    return counts;
-  }, {});
+  const index = tx.objectStore(STORE_RECORDINGS).index("gestureName");
+  const counts: Record<string, number> = {};
+  return new Promise((resolve, reject) => {
+    // A key cursor walks the index only — no recording's samples are loaded.
+    const request = index.openKeyCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve(counts);
+        return;
+      }
+      const name = String(cursor.key);
+      counts[name] = (counts[name] || 0) + 1;
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
 }
 
 /**
@@ -166,7 +187,8 @@ export function renameGesture(oldName: string, newName: string): Promise<void> {
 export async function deleteRecording(id: number): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(STORE_RECORDINGS, "readwrite");
-  await promisify(tx.objectStore(STORE_RECORDINGS).delete(id));
+  tx.objectStore(STORE_RECORDINGS).delete(id);
+  await txDone(tx);
 }
 
 // ─── Models (templates) ────────────────────────────────────────────────────────
@@ -189,7 +211,9 @@ export async function saveModel(
     createdAt: new Date().toISOString(),
     templates,
   };
+  const done = txDone(tx);
   const id = (await promisify(store.add(record))) as number;
+  await done;
   return { id, ...record };
 }
 
@@ -208,5 +232,6 @@ export async function getAllModels(): Promise<GestureModel[]> {
 export async function deleteModel(id: number): Promise<void> {
   const db = await openDB();
   const tx = db.transaction(STORE_MODELS, "readwrite");
-  await promisify(tx.objectStore(STORE_MODELS).delete(id));
+  tx.objectStore(STORE_MODELS).delete(id);
+  await txDone(tx);
 }

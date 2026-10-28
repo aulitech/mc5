@@ -13,7 +13,8 @@ export interface GestureStore {
   /** Recordings per class, newest first — only for classes that have been loaded. */
   recordings: Record<string, Recording[]>;
   loadRecordings: (gestureName: string) => Promise<void>;
-  addRecording: (gestureName: string, samples: Sample[]) => Promise<void>;
+  /** Resolves false (after notifying) if the recording couldn't be saved. */
+  addRecording: (gestureName: string, samples: Sample[]) => Promise<boolean>;
   deleteRecording: (recording: Recording) => Promise<void>;
   deleteClass: (gestureName: string) => Promise<void>;
   /** Relabel a class; renaming onto an existing class merges them. */

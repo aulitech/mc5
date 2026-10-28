@@ -1,7 +1,16 @@
 import LOGO from "../../assets/logo.svg";
-import { version } from "/package.json";
+import { version } from "../../../package.json";
+import type { Config } from "../../types/config";
+import type { CatoDevice, DeviceStatus } from "../../types/device";
 import { HStack, VStack } from "./Utility";
-const Logo = ({ data, device, catoStatus }) => (
+
+interface LogoProps {
+  data: Config | null;
+  device: CatoDevice | null;
+  catoStatus: DeviceStatus | null;
+}
+
+const Logo = ({ data, device, catoStatus }: LogoProps) => (
   <HStack
     style={{
       fontSize: "larger",
@@ -16,7 +25,7 @@ const Logo = ({ data, device, catoStatus }) => (
     <a href="https://AULI.TECH" target="_blank" rel="noopener noreferrer">
       <img
         src={LOGO}
-        alt="logo"
+        alt="AULI.TECH"
         style={{
           height: "1.5rem",
           marginRight: ".5rem",
@@ -42,7 +51,8 @@ const Logo = ({ data, device, catoStatus }) => (
           <span>{device.productName}</span>
           {device?.info && (
             <span>
-              {data?.profiles?.[catoStatus?.conIdx]?.name || `Profile ${catoStatus?.conIdx + 1}`}{"  "}
+              {(catoStatus && data?.profiles?.[catoStatus.conIdx]?.name) ||
+                `Profile ${(catoStatus?.conIdx ?? 0) + 1}`}{"  "}
               {device?.info?.version?.string ?? ""}
             </span>
           )}

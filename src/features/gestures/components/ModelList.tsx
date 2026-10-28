@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import { useDialog } from "../../../context/DialogContext";
+import { errorMessage, notify } from "../../../lib/notify";
 import type { GestureModel } from "../../../types/gestures";
 import { exportTemplatesZip } from "../lib/templateGen";
 import { useGestureStore } from "../state/GestureStoreContext";
@@ -43,13 +44,25 @@ function ModelList() {
                   style={{ cursor: "pointer" }}
                 >
                   <div className={styles.modelCardHeader}>
-                    <span className={styles.modelName}>{model.modelName}</span>
+                    <button
+                      className={`btn-plain ${styles.modelName}`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedId((prev) => (prev === model.id ? null : model.id));
+                      }}
+                      aria-pressed={model.id === selectedId}
+                      title="Show this model's templates"
+                    >
+                      {model.modelName}
+                    </button>
                     <div className={styles.modelCardActions}>
                       <button
                         className={styles.btn}
                         onClick={(e) => {
                           e.stopPropagation();
-                          downloadModel(model);
+                          downloadModel(model).catch((err) =>
+                            notify.error(`Couldn't create the download: ${errorMessage(err)}`),
+                          );
                         }}
                       >
                         Download
@@ -61,6 +74,7 @@ function ModelList() {
                           handleDelete(model);
                         }}
                         title="Delete this model"
+                        aria-label={`Delete model "${model.modelName}"`}
                       >
                         ×
                       </button>

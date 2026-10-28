@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { lazy, Suspense, useState, type ComponentType } from "react";
 import { Sun, Moon, SunMoon } from "lucide-react";
 
 // Context
@@ -6,7 +6,7 @@ import { useConfig } from "../../context/ConfigContext";
 import { useDevice } from "../../context/DeviceContext";
 import { useSettings, type Theme } from "../../context/SettingsContext";
 import { useOtaEvent } from "../../device/useOtaEvent";
-import { fetchLatestReleases, type Release } from "../../lib/releases";
+import { fetchLatestReleases, isInstalled, type Release } from "../../lib/releases";
 import { errorMessage, notify } from "../../lib/notify";
 
 // Tabs
@@ -15,7 +15,6 @@ import TestsTab from "../tabs/TestsTab";
 import ActionManagerTab from "../tabs/ActionManagerTab";
 import ProfileManagerTab from "../tabs/ProfileManagerTab";
 import PracticeTab from "../tabs/PracticeTab";
-import GestureTab from "../../features/gestures/GestureTab";
 import MainInstructions from "../help/MainInstructions";
 import NoHID from "../help/NoHID";
 import CatoCommands from "./CatoCommands";
@@ -23,6 +22,9 @@ import HoverClickButton from "./HoverClickButton";
 import { HStack, VStack, Ring } from "./Utility";
 import Update from "./Update";
 import Logo from "./Logo";
+
+// Experimental, and the only user of three.js — loaded on first open.
+const GestureTab = lazy(() => import("../../features/gestures/GestureTab"));
 
 interface TabDef {
   id: string;
@@ -55,15 +57,18 @@ const Shell = () => {
   const { theme, setTheme, isAdvanced, setIsAdvanced, showExperimental, setShowExperimental } =
     useSettings();
   const [activeTab, setActiveTab] = useState("General");
-  const [releases, setReleases] = useState<Release[]>([]);
+  // The release on offer while the update screen is open.
+  const [update, setUpdate] = useState<Release | null>(null);
 
   useOtaEvent("disconnect", () => setActiveTab("General"));
 
   const checkForUpdates = async () => {
     try {
-      const latest = await fetchLatestReleases();
-      if (latest.length === 0) notify.info("No firmware releases found.");
-      setReleases(latest);
+      const [latest] = await fetchLatestReleases();
+      const installedVersion = device?.info.version?.string;
+      if (!latest) notify.info("No firmware releases found.");
+      else if (isInstalled(latest, installedVersion)) notify.success(`Cato is up to date (${installedVersion}).`);
+      else setUpdate(latest);
     } catch (err) {
       console.error("Error fetching releases:", err);
       notify.error(`Couldn't check for updates: ${errorMessage(err)}`);
@@ -130,8 +135,8 @@ const Shell = () => {
             <Ring color="var(--led-blue)" />
           </div>
         </VStack>
-      ) : releases.length > 0 ? (
-        <Update releases={releases} setReleases={setReleases} />
+      ) : update ? (
+        <Update release={update} onClose={() => setUpdate(null)} />
       ) : !data ? (
         <MainInstructions onConnect={connect} />
       ) : (
@@ -182,6 +187,7 @@ const Shell = () => {
                 <input
                   style={{ width: "1rem" }}
                   type="checkbox"
+                  aria-label="Advanced"
                   checked={isAdvanced}
                   onChange={(e) => setIsAdvanced(e.target.checked)}
                 />
@@ -192,6 +198,7 @@ const Shell = () => {
                   <input
                     style={{ width: "1rem" }}
                     type="checkbox"
+                    aria-label="Experimental"
                     checked={showExperimental}
                     onChange={(e) => setShowExperimental(e.target.checked)}
                   />
@@ -215,7 +222,9 @@ const Shell = () => {
               alignItems: "center",
             }}
           >
-            <ActiveTab />
+            <Suspense fallback={<Ring color="var(--led-blue)" />}>
+              <ActiveTab />
+            </Suspense>
           </VStack>
         </>
       )}

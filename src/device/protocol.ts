@@ -72,15 +72,30 @@ export function encodeCommand(command: string): Uint8Array<ArrayBuffer>[] {
 export interface ResponseState {
   /** >0 while more feature reports are expected. */
   remaining: number;
-  data: string;
+  /**
+   * Raw UTF-8 payload so far. Lengths in the report header count bytes, and a
+   * multi-byte character can straddle two reports, so decoding waits until
+   * the whole response is in (see responseText).
+   */
+  bytes: Uint8Array;
   error: string | null;
 }
 
 export const initialResponseState = (): ResponseState => ({
   remaining: 1,
-  data: "",
+  bytes: new Uint8Array(0),
   error: null,
 });
+
+const concatBytes = (a: Uint8Array, b: Uint8Array) => {
+  const out = new Uint8Array(a.length + b.length);
+  out.set(a, 0);
+  out.set(b, a.length);
+  return out;
+};
+
+/** The accumulated response decoded as text. */
+export const responseText = (state: ResponseState) => new TextDecoder().decode(state.bytes);
 
 /** Fold one received feature report into the accumulated response. */
 export function applyResponseChunk(state: ResponseState, dv: DataView): ResponseState {
@@ -89,17 +104,17 @@ export function applyResponseChunk(state: ResponseState, dv: DataView): Response
     dv.byteOffset + OTA_FR.read.headerLength,
     Math.max(0, dv.byteLength - OTA_FR.read.headerLength),
   );
+  // Bytes still to come, including this report's.
   const reportLength = dv.getUint16(OTA_FR.read.lenIndex, true);
   const msgType = dv.getUint8(OTA_FR.read.msgTypeIndex);
-  let text = new TextDecoder().decode(payload);
-  text = text.slice(0, Math.min(reportLength, text.length));
+  const chunk = payload.slice(0, Math.min(reportLength, payload.length));
 
   const next: ResponseState = { ...state, remaining: 0 };
   switch (msgType) {
     case MSG.FIRST:
     case MSG.MID:
-      next.remaining = Math.max(0, reportLength - text.length);
-      next.data += text;
+      next.remaining = Math.max(0, reportLength - chunk.length);
+      next.bytes = concatBytes(state.bytes, chunk);
       break;
     case MSG.ACK_NRSP:
       break;
@@ -107,13 +122,13 @@ export function applyResponseChunk(state: ResponseState, dv: DataView): Response
       next.remaining = 1;
       break;
     case MSG.NACK:
-      next.error = text;
+      next.error = new TextDecoder().decode(chunk);
       break;
     case MSG.EMPTY:
       next.error = "Empty response from device.";
       break;
     case MSG.RESULT:
-      next.data = text;
+      next.bytes = chunk;
       break;
     default:
       next.error = `Unknown message type: ${String(msgType)}`;

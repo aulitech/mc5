@@ -37,6 +37,30 @@
   background-color: rgba(255, 255, 255, 0.31);
 }
 
+/* A real, focusable <button> that looks like the text around it — for rows
+   and labels that act on click, so they also work from the keyboard. */
+.btn-plain,
+.btn-plain:hover {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  white-space: normal;
+  cursor: pointer;
+}
+
+/* Keyboard focus is always visible, including on buttons styled without an
+   outline. */
+button:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--led-blue);
+  outline-offset: 2px;
+}
+
 /* Ensure it is visible in Dark Mode */
 [data-theme="dark"] .btn-ghost:hover {
   background-color: rgba(255, 255, 255, 0.12);
@@ -276,7 +300,8 @@
   border-style: solid;
   border-color: transparent #1e293b transparent transparent;
 }
-.tooltip-wrapper:hover .tooltip-content {
+.tooltip-wrapper:hover .tooltip-content,
+.tooltip-wrapper:focus-within .tooltip-content {
   visibility: visible;
   opacity: 1;
 }
@@ -335,7 +360,8 @@
   position: relative;
 }
 
-[data-tooltip]:hover::after {
+[data-tooltip]:hover::after,
+[data-tooltip]:focus-visible::after {
   content: attr(data-tooltip);
   position: absolute;
   bottom: 100%;

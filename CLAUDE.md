@@ -16,9 +16,10 @@ NOTE: Do not use the bluetooth connection or firebase storage protocols from exp
 
 ### Top-Level Structure
 ```
-mc5/                # MyCato — React app (Vite + TypeScript, .jsx still allowed)
+mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
 ├── netlify.toml    # Netlify build (publish dist)
-├── netlify/functions/releases.ts  # /api/releases — server-side GitHub lookup (GITHUB_TOKEN)
+├── netlify/functions/  # releases.ts (/api/releases), asset.ts (/api/asset firmware
+│                       # download) — server-side GitHub calls (GITHUB_TOKEN)
 ├── scripts/        # Utility scripts (ExportSrc.sh)
 └── src/
     ├── App.tsx             # Root — Settings → Device → Config → Dialog providers, then Shell
@@ -27,7 +28,8 @@ mc5/                # MyCato — React app (Vite + TypeScript, .jsx still allowe
     │   ├── protocol.ts     # Pure report encode/decode (unit tested)
     │   └── useOtaEvent.ts  # Subscribe to device events from components
     ├── context/            # SettingsContext, DeviceContext, ConfigContext, DialogContext (+ *Provider.tsx)
-    ├── lib/                # notify (toasts), configPath, configFile (backup/restore), releases
+    ├── lib/                # notify (toasts), configPath, configEdits (index remaps on delete,
+    │                       # backup validation), leafValue, configFile (backup/restore), releases
     ├── types/              # device.ts, config.ts, gestures.ts
     ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
     │                       # lib/templateGen.ts, hooks/ (sensor stream/recorder), state/ (store)
@@ -38,15 +40,16 @@ mc5/                # MyCato — React app (Vite + TypeScript, .jsx still allowe
     │   ├── tools/          # Toolbar/action components
     │   ├── modals/         # Modal dialogs
     │   └── help/           # Help content
-    ├── utils/              # helpers.jsx, schema.ts (getSchema)
+    ├── utils/              # helpers.tsx, schema.ts (getSchema)
     └── constants/
-        ├── mappings.jsx    # Key/value mappings
+        ├── mappings.ts     # Key/value mappings
         └── schemas.ts      # UI schema + defaults — plain data, no React/device imports
 ```
 
 ### Key Concepts
 - **Device layer** — `device/ota.ts` owns the HID connection. `send()` calls are queued (never "Send in progress"); status/sensor/practice reports are events (`useOtaEvent`). It holds no config.
 - **DeviceContext / ConfigContext** — device + status vs. config data. `setConfigValue` edits locally; `updateConfig` edits and sends, rolling back if the device rejects it.
+- **Indices in the config** — action bindings point into `action_list` and `profile_map` into `profiles`. Delete actions with `deleteAction` and profiles with `deleteConfigItem`, which re-point them; don't splice those arrays directly.
 - **Recursive tree rendering** — components in `tree/` render JSON nodes recursively from `UI_SCHEMA(gestureNames)`.
 - **Errors and confirmations** — use `notify` (lib/notify.ts) and `useDialog()`, not `alert`/`confirm`/`prompt`.
-- **Checks** — `npm run typecheck`, `npm run lint`, `npm test`; `npm run build` runs the typecheck first.
+- **Checks** — `npm run typecheck`, `npm run lint`, `npm test` (also the pre-commit hook); `npm run build` runs the typecheck first. Component tests use jsdom (`// @vitest-environment jsdom`); IndexedDB tests use `fake-indexeddb`.

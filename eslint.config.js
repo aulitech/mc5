@@ -8,7 +8,8 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist', '.netlify']),
   {
-    files: ['**/*.{js,jsx}'],
+    // Config files only — app code is all TypeScript.
+    files: ['**/*.js'],
     extends: [
       js.configs.recommended,
       reactHooks.configs.flat.recommended,

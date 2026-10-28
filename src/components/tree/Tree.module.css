@@ -15,6 +15,12 @@
   overflow: visible
 }
 
+.group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .group-header:hover {
   background-color: var(--bg-hover);
 }

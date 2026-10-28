@@ -8,8 +8,14 @@ export type ConfigPath = (string | number)[];
 export interface ConfigAction {
   label: string | null;
   command: string;
-  args?: unknown[];
+  args?: unknown[] | null;
 }
+
+/**
+ * Args of a "button" action: device (0 mouse, 1 keyboard), press type, then
+ * the button/key code — a bare mouse button, or [HID code, modifier mask].
+ */
+export type ButtonArgs = [actor: number, type: string, code: number | [number, number]];
 
 export type OrientationCode = "u" | "d" | "l" | "r" | "f" | "b";
 

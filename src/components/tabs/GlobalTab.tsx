@@ -1,5 +1,4 @@
-import React from "react";
-import { Link, Bluetooth, Settings } from "lucide-react";
+import { Bluetooth } from "lucide-react";
 import { useConfig } from "../../context/ConfigContext";
 import { useDevice } from "../../context/DeviceContext";
 import { useSettings } from "../../context/SettingsContext";
@@ -7,7 +6,7 @@ import JsonNodeRenderer from "../tree/JsonNodeRenderer";
 import styles from "./GlobalTab.module.css";
 import { HStack, VStack } from "../ui/Utility";
 
-const LedIndicator = ({ count }) => (
+const LedIndicator = ({ count }: { count: number }) => (
   <HStack style={{ gap: "4px", position: "relative", top: "-1.4rem" }}>
     {Array.from({ length: count }).map((_, i) => (
       <div key={i} className={styles["led-dot"]} />
@@ -24,19 +23,20 @@ const GlobalTab = () => {
   const profiles = data.profiles;
   const globalInfo = data.global_info;
 
-  const handleMapChange = (idx, value) => {
+  const handleMapChange = (idx: number, value: string) => {
     const newMap = [...globalInfo.profile_map];
-    newMap[idx] = parseInt(value);
+    newMap[idx] = parseInt(value, 10);
     updateConfig(["global_info", "profile_map"], newMap);
   };
 
-  const toggleSkip = (idx, isSkipped) => {
+  // A skipped connection is stored as -(profile + 1), so un-skipping restores it.
+  const toggleSkip = (idx: number, isSkipped: boolean) => {
     const newMap = [...globalInfo.profile_map];
-    if (isSkipped)
-      newMap[idx] = -Math.abs(newMap[idx] + 1); // Set to negative to indicate skip
-    else newMap[idx] = Math.abs(newMap[idx]) - 1; // Restore to valid profile index (default to 0 if it was -1)
+    newMap[idx] = isSkipped ? -(newMap[idx] + 1) : -newMap[idx] - 1;
     updateConfig(["global_info", "profile_map"], newMap);
   };
+
+  const sanitizeName = (name: string) => name.replace(/[^a-zA-Z0-9_\- ']/g, "");
   return (
     <div
       style={{
@@ -55,20 +55,17 @@ const GlobalTab = () => {
         }}
       >
         <VStack style={{ alignItems: "flex-start", gap: "0.5rem" }}>
-          <span>Name</span>
+          <label htmlFor="device-name">Name</label>
           <input
+            id="device-name"
             className="input-base"
             maxLength={14}
-            value={globalInfo.name || device?.productName.slice(0, -4)}
-            onChange={(e) =>
-              setConfigValue(
-                ["global_info", "name"],
-                e.target.value.replace(/[^a-zA-Z0-9_\- ']/g, ""),
-              )
-            }
-            onBlur={(e) =>
-              updateConfig(["global_info", "name"], e.target.value)
-            }
+            value={globalInfo.name || device?.productName.slice(0, -4) || ""}
+            onChange={(e) => setConfigValue(["global_info", "name"], sanitizeName(e.target.value))}
+            onBlur={(e) => updateConfig(["global_info", "name"], sanitizeName(e.target.value))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+            }}
           />
         </VStack>
         <span>ID: {globalInfo.HW_UID}</span>
@@ -86,7 +83,7 @@ const GlobalTab = () => {
             }}
           >
             {[0, 1, 2].map((i) => {
-              const isSkipped = globalInfo?.profile_map[i] < 0;
+              const isSkipped = globalInfo.profile_map[i] < 0;
               return (
                 <VStack
                   key={i}
@@ -136,6 +133,7 @@ const GlobalTab = () => {
                         <input
                           style={{ width: "1rem" }}
                           type="checkbox"
+                          aria-label={`Skip connection ${i + 1}`}
                           checked={isSkipped}
                           onChange={(e) => toggleSkip(i, e.target.checked)}
                         />
@@ -143,22 +141,19 @@ const GlobalTab = () => {
                     </HStack>
                   </HStack>
                   {!isSkipped && (
-                    <>
-                      <select
-                        className="input-base"
-                        value={isSkipped ? "" : globalInfo.profile_map[i]}
-                        onChange={(e) => handleMapChange(i, e.target.value)}
-                        disabled={isSkipped}
-                        style={{ marginBottom: "0.75rem" }}
-                      >
-                        {isSkipped && <option value="">(Skipped)</option>}
-                        {profiles.map((p, idx) => (
-                          <option key={idx} value={idx}>
-                            {p.name || `Profile ${idx}`}
-                          </option>
-                        ))}
-                      </select>
-                    </>
+                    <select
+                      className="input-base"
+                      aria-label={`Profile for connection ${i + 1}`}
+                      value={globalInfo.profile_map[i]}
+                      onChange={(e) => handleMapChange(i, e.target.value)}
+                      style={{ marginBottom: "0.75rem" }}
+                    >
+                      {profiles.map((p, idx) => (
+                        <option key={idx} value={idx}>
+                          {p.name || `Profile ${idx}`}
+                        </option>
+                      ))}
+                    </select>
                   )}
                 </VStack>
               );
@@ -168,9 +163,7 @@ const GlobalTab = () => {
       )}
 
       {/* 3. FLATTENED REMAINDER */}
-      <div className={"section-title"}>
-         Device Configuration
-      </div>
+      <div className={"section-title"}>Device Configuration</div>
       <JsonNodeRenderer
         name="Global Config"
         data={globalInfo}

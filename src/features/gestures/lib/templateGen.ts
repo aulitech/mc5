@@ -42,15 +42,61 @@ function gyroMag(sample: Sample) {
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
+// A step this many times the usual sample interval means samples were lost.
+const GAP_FACTOR = 1.5;
+// Never invent more than this many samples for one gap.
+const MAX_GAP_FILL = 50;
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const lerpTriple = (a: Sample["acc"], b: Sample["acc"], t: number): Sample["acc"] => [
+  lerp(a[0], b[0], t),
+  lerp(a[1], b[1], t),
+  lerp(a[2], b[2], t),
+];
+
+/**
+ * Fill dropped samples by linear interpolation, so the fixed-length window
+ * below always covers the same span of time. The usual interval is the
+ * median timestamp step, so the timestamp unit doesn't matter. Recordings
+ * without timestamps are returned unchanged.
+ */
+export function fillGaps(samples: Sample[]): Sample[] {
+  if (samples.length < 3 || samples.some((s) => s.ts === undefined)) return samples;
+  const deltas = samples.slice(1).map((s, i) => s.ts! - samples[i].ts!);
+  const interval = [...deltas].sort((a, b) => a - b)[Math.floor(deltas.length / 2)];
+  if (!(interval > 0)) return samples;
+
+  const out: Sample[] = [samples[0]];
+  for (let i = 1; i < samples.length; i++) {
+    const prev = samples[i - 1];
+    const cur = samples[i];
+    const gap = deltas[i - 1];
+    if (gap >= GAP_FACTOR * interval) {
+      const missing = Math.min(MAX_GAP_FILL, Math.round(gap / interval) - 1);
+      for (let k = 1; k <= missing; k++) {
+        const t = k / (missing + 1);
+        out.push({
+          ts: prev.ts! + Math.round(gap * t),
+          acc: lerpTriple(prev.acc, cur.acc, t),
+          gyro: lerpTriple(prev.gyro, cur.gyro, t),
+        });
+      }
+    }
+    out.push(cur);
+  }
+  return out;
+}
+
 /**
  * Trim a raw recording array to a fixed 100-sample window centred on the
- * gesture peak. Returns null if the window falls out of the recording bounds
+ * gesture peak (after filling any dropped samples). Returns null if the window falls out of the recording bounds
  * (e.g. gesture started too late or too early in the buffer).
  *
- * @param samples - Raw IMU samples
+ * @param recorded - Raw IMU samples
  * @returns 100-element slice, or null if unusable
  */
-export function preprocessRecording(samples: Sample[]): Sample[] | null {
+export function preprocessRecording(recorded: Sample[]): Sample[] | null {
+  const samples = fillGaps(recorded);
   let motionStart = 0;
 
   // Phase 1: skip the "thrash window" — the first few samples where the user

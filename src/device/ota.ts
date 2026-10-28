@@ -27,10 +27,20 @@ import {
   normalizeGestureList,
   parseSensor,
   parseStatus,
+  responseText,
 } from "./protocol";
 
 const FILTERS = [{ vendorId: 0x1915, productId: 0x52dd }];
 const MAX_PROFILES = 20;
+
+// A response that hasn't finished arriving by then is abandoned, so one stuck
+// command can't hold up the queue forever. Generous, since some commands
+// (e.g. "config save") write flash before answering.
+const RESPONSE_TIMEOUT_MS = 10000;
+
+// The device's answer to "config get" on a path that doesn't exist — how the
+// end of the profile list shows up.
+const isMissingNode = (err: unknown) => String(err).toLowerCase().includes("found null node");
 
 // ── Events ────────────────────────────────────────────────────────────────────
 
@@ -178,16 +188,17 @@ function onHidDisconnect(event: HIDConnectionEvent) {
 async function receiveResponse(d: HIDDevice): Promise<unknown> {
   if (!d.opened) throw new Error("Device not opened");
 
+  const deadline = Date.now() + RESPONSE_TIMEOUT_MS;
   let state = initialResponseState();
   while (state.remaining > 0) {
-    const dv = await d.receiveFeatureReport(OTA_FR.id).catch((err) => {
+    const dv = await withDeadline(d.receiveFeatureReport(OTA_FR.id), deadline).catch((err) => {
       throw new Error(`Error receiving feature report: ${String(err)}`);
     });
     state = applyResponseChunk(state, dv);
   }
 
   if (state.error) {
-    if (state.error.toLowerCase().includes("found null node")) {
+    if (isMissingNode(state.error)) {
       console.warn("OTA Warning: Found null node.");
     } else {
       console.error("OTA Error in report response: ", state.error);
@@ -195,12 +206,24 @@ async function receiveResponse(d: HIDDevice): Promise<unknown> {
     throw new Error(state.error);
   }
 
-  if (state.data.length === 0) return state.data;
+  const text = responseText(state);
+  if (text.length === 0) return text;
   try {
-    return JSON.parse(state.data);
+    return JSON.parse(text);
   } catch (e) {
     throw new Error("Error parsing JSON response: " + String(e));
   }
+}
+
+function withDeadline<T>(promise: Promise<T>, deadline: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`No response from Cato within ${RESPONSE_TIMEOUT_MS / 1000}s`)),
+      Math.max(0, deadline - Date.now()),
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 async function sendNow(command: string): Promise<unknown> {
@@ -284,6 +307,7 @@ export async function connect(): Promise<CatoDevice | null> {
   const [selected] = await navigator.hid.requestDevice({ filters: FILTERS });
   if (!selected) return null;
 
+  await close().catch(() => {}); // drop any previous device and its listeners
   try {
     device = selected;
     await selected.open();
@@ -305,19 +329,33 @@ export async function connect(): Promise<CatoDevice | null> {
   }
 }
 
+export interface ReadConfigResult {
+  config: Config;
+  /**
+   * Set when a profile couldn't be read (twice) for a reason other than the
+   * list ending — profiles from this index on are missing from `config`.
+   */
+  unreadProfile?: number;
+}
+
 /** Read global_info and every profile from the connected device. */
-export async function readConfig(): Promise<Config> {
+export async function readConfig(): Promise<ReadConfigResult> {
   const global_info = await send<GlobalInfo>("config get /global_info");
   const profiles: Profile[] = [];
   for (let i = 0; i < MAX_PROFILES; i++) {
+    const read = () => send<Profile>(`config get /profiles/${i}`);
     try {
-      profiles.push(await send<Profile>(`config get /profiles/${i}`));
-    } catch {
-      console.log("End of profiles at index ", i);
-      break;
+      profiles.push(await read().catch((err) => (isMissingNode(err) ? Promise.reject(err) : read())));
+    } catch (err) {
+      if (isMissingNode(err)) {
+        console.log("End of profiles at index ", i);
+        break;
+      }
+      console.error(`Couldn't read profile ${i}:`, err);
+      return { config: { global_info, profiles }, unreadProfile: i };
     }
   }
-  return { global_info, profiles };
+  return { config: { global_info, profiles } };
 }
 
 /** Forget the device and emit "disconnect". Safe to call when not connected. */

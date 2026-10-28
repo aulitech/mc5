@@ -25,3 +25,6 @@ dist-ssr
 
 # Netlify CLI local state
 .netlify
+
+# Output of scripts/ExportSrc.sh
+project_context.txt
