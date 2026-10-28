@@ -1,10 +1,9 @@
-# Netlify build for MyCato (the Vite app lives in MyCato/).
+# Netlify build for MyCato.
 # Required environment variable (Site settings → Environment variables):
 #   GITHUB_TOKEN — fine-grained token with read-only "Contents" access to
-#                  aulitech/z_cato, used by MyCato/netlify/functions/releases.ts
+#                  aulitech/z_cato, used by netlify/functions/releases.ts
 
 [build]
-  base = "MyCato"
   command = "npm run build"
   publish = "dist"
 

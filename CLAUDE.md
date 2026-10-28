@@ -1,9 +1,9 @@
-# MC3 — MyCato (v3)
+# MyCato
 
 ## Project Overview
 MyCato is a React-based configuration UI for the Cato device. It uses recursive JSON node rendering to allow users to build and edit device configurations. This project aims to build out the "Gestures" tab by adding all features from the Gesture Collection app at: "C:\Repositories\expense-tracker"
 
-These are the features that should be incorporated into the "Gestures" tab of mc3 from expense-tracker:
+These are the features that should be incorporated into the "Gestures" tab of MyCato from expense-tracker:
 
 1. Gesture Collection - Users collect and save IMU gesture data (current expense-tracker location: GestureControl, Gesture Inputs, Gesture Summary, gesture-collection)
 2. Gesture Visulization - A 3d visualization of each gesture class (current expense-tracker location: GestureVisualizer)
@@ -16,34 +16,32 @@ NOTE: Do not use the bluetooth connection or firebase storage protocols from exp
 
 ### Top-Level Structure
 ```
-mc3/
-├── netlify.toml    # Netlify build (base MyCato, publish dist)
-├── MyCato/         # Main React app (Vite + TypeScript, .jsx still allowed)
-│   ├── netlify/functions/releases.ts  # /api/releases — server-side GitHub lookup (GITHUB_TOKEN)
-│   └── src/
-│       ├── App.tsx             # Root — Settings → Device → Config → Dialog providers, then Shell
-│       ├── device/
-│       │   ├── ota.ts          # WebHID transport: queued send(), connect/readConfig/close, on(event)
-│       │   ├── protocol.ts     # Pure report encode/decode (unit tested)
-│       │   └── useOtaEvent.ts  # Subscribe to device events from components
-│       ├── context/            # SettingsContext, DeviceContext, ConfigContext, DialogContext (+ *Provider.tsx)
-│       ├── lib/                # notify (toasts), configPath, configFile (backup/restore), releases
-│       ├── types/              # device.ts, config.ts, gestures.ts
-│       ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
-│       │                       # lib/templateGen.ts, hooks/ (sensor stream/recorder), state/ (store)
-│       ├── components/
-│       │   ├── ui/             # Shell (tab registry), Toaster, HoverClickButton, base UI chrome
-│       │   ├── tabs/           # Top-level tab views
-│       │   ├── tree/           # Recursive JSON node tree rendering (custom editors registered in JsonNodeRenderer)
-│       │   ├── tools/          # Toolbar/action components
-│       │   ├── modals/         # Modal dialogs
-│       │   └── help/           # Help content
-│       ├── utils/              # helpers.jsx, schema.ts (getSchema)
-│       └── constants/
-│           ├── mappings.jsx    # Key/value mappings
-│           └── schemas.ts      # UI schema + defaults — plain data, no React/device imports
-├── scripts/        # Build or utility scripts
-└── package.json    # Root-level deps (lucide-react)
+mc5/                # MyCato — React app (Vite + TypeScript, .jsx still allowed)
+├── netlify.toml    # Netlify build (publish dist)
+├── netlify/functions/releases.ts  # /api/releases — server-side GitHub lookup (GITHUB_TOKEN)
+├── scripts/        # Utility scripts (ExportSrc.sh)
+└── src/
+    ├── App.tsx             # Root — Settings → Device → Config → Dialog providers, then Shell
+    ├── device/
+    │   ├── ota.ts          # WebHID transport: queued send(), connect/readConfig/close, on(event)
+    │   ├── protocol.ts     # Pure report encode/decode (unit tested)
+    │   └── useOtaEvent.ts  # Subscribe to device events from components
+    ├── context/            # SettingsContext, DeviceContext, ConfigContext, DialogContext (+ *Provider.tsx)
+    ├── lib/                # notify (toasts), configPath, configFile (backup/restore), releases
+    ├── types/              # device.ts, config.ts, gestures.ts
+    ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
+    │                       # lib/templateGen.ts, hooks/ (sensor stream/recorder), state/ (store)
+    ├── components/
+    │   ├── ui/             # Shell (tab registry), Toaster, HoverClickButton, base UI chrome
+    │   ├── tabs/           # Top-level tab views
+    │   ├── tree/           # Recursive JSON node tree rendering (custom editors registered in JsonNodeRenderer)
+    │   ├── tools/          # Toolbar/action components
+    │   ├── modals/         # Modal dialogs
+    │   └── help/           # Help content
+    ├── utils/              # helpers.jsx, schema.ts (getSchema)
+    └── constants/
+        ├── mappings.jsx    # Key/value mappings
+        └── schemas.ts      # UI schema + defaults — plain data, no React/device imports
 ```
 
 ### Key Concepts
