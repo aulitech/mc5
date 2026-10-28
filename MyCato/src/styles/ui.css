@@ -1,0 +1,375 @@
+/* --- BUTTONS --- */
+.btn-danger {
+  background: rgba(231, 76, 60, 0.1);
+  color: var(--danger);
+}
+
+/* CHANGE: Primary button is now Gold with Dark Text */
+.btn-primary {
+  background: var(--primary);
+  color: var(--brand-dark); /* Dark text for contrast on gold */
+}
+.btn-primary:hover {
+  background: var(--primary-hover);
+  color: var(--color-button-hover);
+}
+
+/* Ghost buttons for headers/icons */
+.btn-ghost {
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  /* Use header text color if inside header, otherwise main text */
+  color: inherit;
+  padding: 0.25rem;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.31);
+}
+
+/* Ensure it is visible in Dark Mode */
+[data-theme="dark"] .btn-ghost:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: white;
+}
+
+.btn-danger:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--danger);
+}
+
+/* --- INPUTS --- */
+.input-base {
+  min-width: 10rem;
+  width: min-content;
+  padding: 0.5rem 0.75rem;
+  font-size: medium;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  background-color: var(--bg-input);
+  color: var(--color-input);
+  transition: all 0.2s;
+}
+.input-base:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.input-base:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  background: var(--bg-app);
+}
+
+/* --- TOGGLES --- */
+.toggle-switch {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+.toggle-input {
+  display: none;
+}
+.toggle-track {
+  width: 40px;
+  height: 22px;
+  background: var(--bg);
+  border-radius: 20px;
+  position: relative;
+  transition: 0.2s;
+}
+.toggle-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--color-toolbar);
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+.toggle-input:checked + .toggle-track {
+  background: var(--bg);
+}
+.toggle-input:checked + .toggle-track .toggle-thumb {
+  background-color: var(--color-input);
+  transform: translateX(18px);
+}
+
+/* --- SLIDERS --- */
+.range-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  width: fit-content;
+  margin-bottom: 0.5rem;
+}
+.range-label {
+  font-size: medium;
+}
+.range-slider {
+  flex: 1;
+  accent-color: var(--color-input);
+  cursor: pointer;
+  height: 1rem;
+  width: 2rem;
+  border-radius: 4px;
+}
+
+/* --- CUSTOM NUMBER SPINNERS --- */
+.input-number-no-spin::-webkit-outer-spin-button,
+.input-number-no-spin::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.custom-spinner-wrapper {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.spinner-btns {
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--input-border);
+  background: var(--bg-toolbar);
+}
+.btn-spin {
+  border: none;
+  padding: 0 4px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-sub);
+  background: transparent;
+  cursor: pointer;
+}
+.btn-spin:hover {
+  background: var(--bg-hover);
+  color: var(--primary);
+}
+.btn-spin:first-child {
+  border-bottom: 1px solid var(--input-border);
+}
+
+/* --- MODALS (Shared Logic) --- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+/* Standard Modal Box */
+.modal-box {
+  background: var(--bg-card);
+  width: 100%;
+  max-width: 900px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+/* Large Modal Box (Graph, JSON) */
+.modal-box-large {
+  background: var(--bg-card);
+  width: 95%;
+  max-width: 1100px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.modal-header,
+.modal-header-compact {
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--bg-toolbar);
+}
+.modal-header-compact {
+  padding: 0.5rem 1rem;
+}
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+.modal-footer {
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg-toolbar);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+/* --- TOOLTIPS --- */
+.tooltip-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  cursor: help;
+  color: var(--text-sub);
+}
+.tooltip-wrapper:hover {
+  color: var(--primary);
+}
+.tooltip-content {
+  visibility: hidden;
+  opacity: 0;
+  position: absolute;
+  bottom: auto;
+  top: 50%;
+  left: 100%;
+  transform: translateY(-50%);
+  margin-left: 10px;
+  background-color: #1e293b;
+  color: #ffffff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: smaller;
+  font-weight: 500;
+  width: max-content;
+  max-width: 250px;
+  white-space: normal;
+  z-index: 9999;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.tooltip-content::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: 100%;
+  margin-top: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: transparent #1e293b transparent transparent;
+}
+.tooltip-wrapper:hover .tooltip-content {
+  visibility: visible;
+  opacity: 1;
+}
+
+/* --- UTILITIES --- */
+.text-primary {
+  color: var(--color);
+}
+.text-disabled {
+  color: var(--color-disabled);
+}
+.text-bluetooth {
+  color: var(--led-blue);
+}
+.text-indigo-500 {
+  color: #6366f1;
+} /* Fallback for specific color */
+.text-green-500 {
+  color: #22c55e;
+}
+.text-red-500 {
+  color: var(--danger);
+}
+.text-amber-500 {
+  color: #f59e0b;
+}
+.text-blue-500 {
+  color: var(--led-blue);
+}
+.text-gray-400 {
+  color: var(--color-input);
+}
+.text-gray-500 {
+  color: var(--color-input);
+}
+
+/* Layout Utils found in your JSX */
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+.p-3 {
+  padding: 0.75rem;
+}
+.grid {
+  display: grid;
+}
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+.gap-2 {
+  gap: 0.5rem;
+}
+
+/* --- GENERIC TOOLTIPS (Replaces title attribute) --- */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-6px);
+
+  /* Match your existing .tooltip-content styles */
+  background-color: #1e293b;
+  color: #ffffff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: smaller;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 1000;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+
+  /* Animation */
+  opacity: 0;
+  animation: fadeInTooltip 0.2s forwards;
+}
+
+@keyframes fadeInTooltip {
+  to {
+    opacity: 1;
+  }
+}
+
+.section-title {
+  font-size: larger;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+}

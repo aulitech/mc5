@@ -1,0 +1,613 @@
+/* GestureTab.module.css */
+
+/* ── Top-level container ──────────────────────────────────────────────────── */
+.container {
+  background-color: var(--bg-card);
+  color: var(--color-card);
+  padding: 1rem;
+  border-radius: 0.5rem;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  box-sizing: border-box;
+}
+
+/* ── Stream control bar ───────────────────────────────────────────────────── */
+.streamBar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border, #ddd);
+}
+
+.streamStatus {
+  font-size: 0.85rem;
+  color: var(--color-muted, #666);
+}
+
+/* ── Two-column main layout ───────────────────────────────────────────────── */
+.mainLayout {
+  display: flex;
+  flex-direction: row;
+  gap: 2rem;
+  align-items: flex-start;
+}
+
+/* Groups a heading with the pair of columns underneath it */
+.pageSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pageSection + .pageSection {
+  padding-left: 2rem;
+  border-left: 2px solid var(--border, #ddd);
+}
+
+.pageSectionTitle {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.pageSectionBody {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 220px;
+  max-width: 260px;
+}
+
+/* Column 1 (Gesture Recordings side) only — a bit more breathing room
+   between inputs/controls/saved-gestures/generate than the default gap. */
+.recordingsPanel {
+  gap: 1.5rem;
+}
+
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  flex: 1;
+  align-items: flex-start;
+  margin-left: 6rem;
+}
+
+/* Column 2: just the visualizer, sized to its own fixed content */
+.visualizerColumn {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ── Gesture inputs ───────────────────────────────────────────────────────── */
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.inputGroup label {
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.inputGroup select,
+.textInput {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border, #ccc);
+  background: var(--bg, #fff);
+  color: var(--color, #111);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ── Gesture control (record / progress) ──────────────────────────────────── */
+.gestureControl {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.progressBarContainer {
+  position: relative;
+  width: 100%;
+  padding-bottom: 1.1rem;
+}
+
+.progressBarWrap {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  /* left→right maps to end→start of the 2-second window:
+     red = last quarter | green = gesture window | red = first quarter */
+  /* 2.5s window: ~1s red start (40%) | ~1s green (40%) | ~0.5s red end (20%) */
+  background: linear-gradient(
+    to right,
+    #ef5350 0% 20%,
+    #43a047 20% 60%,
+    #ef5350 60% 100%
+  );
+}
+
+/* Covers the elapsed (right) portion, revealing the gradient through the remaining time */
+.progressElapsed {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  background: var(--bg-card, #fff);
+}
+
+.labelStart,
+.labelEnd {
+  position: absolute;
+  top: 10px;
+  font-size: 0.62rem;
+  color: var(--color-muted, #777);
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+  user-select: none;
+}
+
+.labelStart { left: 60%; }
+.labelEnd   { left: 20%; }
+
+.sampleCount {
+  font-size: 0.8rem;
+  color: var(--color-muted, #666);
+  margin: 0;
+}
+
+.savingMsg {
+  font-size: 0.8rem;
+  color: var(--color-muted, #666);
+  margin: 0;
+}
+
+.controlRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.checkLabel {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.checkLabel input[type="checkbox"] {
+  width: 1.2rem;
+  height: 1.2rem;
+  cursor: pointer;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+.btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.85rem;
+  border-radius: 4px;
+  border: 1px solid var(--border, #ccc);
+  background: var(--bg-card, #fff);
+  color: var(--color, #111);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn:not(:disabled):hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.btnAccept {
+  composes: btn;
+  border-color: #43a047;
+  color: #43a047;
+}
+
+.btnAccept:not(:disabled):hover {
+  background: #e8f5e9;
+}
+
+.btnReject {
+  composes: btn;
+  border-color: #e53935;
+  color: #e53935;
+}
+
+.btnReject:not(:disabled):hover {
+  background: #ffebee;
+}
+
+/* ── Gesture summary ──────────────────────────────────────────────────────── */
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.summary h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.summaryList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.summaryItem:hover {
+  background: var(--bg-hover, #64ace7);
+}
+
+.summaryItem.selected {
+  border-color: var(--primary, #1e88e5);
+  background: var(--bg-selected, #64ace7);
+}
+
+.gestureName {
+  font-weight: 500;
+}
+
+.gestureCount {
+  font-size: 0.8rem;
+  color: var(--color-muted, #666);
+  background: var(--bg, #eee);
+  border-radius: 10px;
+  padding: 0 0.4rem;
+}
+
+/* ── Standard gestures (built-in nod/tilt templates) ──────────────────────── */
+.standardDivider {
+  border-top: 1px solid var(--border, #ddd);
+  margin: 0.5rem 0;
+}
+
+.standardGesturesHeading {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--color-muted, #666);
+}
+
+/* ── Visualizer ───────────────────────────────────────────────────────────── */
+.visualizerWrap {
+  position: relative;
+  width: 400px;
+  height: 400px;
+  border-radius: 4px;
+  overflow: hidden;
+  /*
+  background: #fafafa;
+  border: 1px solid var(--border, #ddd);
+  */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Visualizer playback controls ────────────────────────────────────────── */
+.vizControls {
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 0.3rem;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--border, #ddd);
+  border-radius: 4px;
+  padding: 0.2rem 0.4rem;
+}
+
+.vizBtn {
+  padding: 0.15rem 0.45rem;
+  font-size: 0.75rem;
+  border-radius: 3px;
+  border: 1px solid var(--border, #ccc);
+  background: transparent;
+  color: var(--color, #333);
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+/* .vizControls has a fixed light background regardless of app theme, so its
+   label text needs a fixed dark color too — var(--color) can turn light in
+   dark mode, making it unreadable against this bar specifically. */
+.vizControls .checkLabel {
+  color: #333;
+}
+
+.vizBtn:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.vizBtnActive {
+  border-color: var(--primary, #1e88e5);
+  color: var(--primary, #1e88e5);
+  background: var(--bg-selected, #e3f2fd);
+}
+
+/* ── Template chart ───────────────────────────────────────────────────────── */
+.chartWrap {
+  width: fit-content;
+}
+
+/* ── Template stats ───────────────────────────────────────────────────────── */
+.templateStats {
+  font-size: 0.78rem;
+  color: var(--color-muted, #666);
+  margin: 0;
+}
+
+/* ── Template actions ─────────────────────────────────────────────────────── */
+.templateActions {
+  display: flex;
+  flex-direction: row;
+  gap: 0.5rem;
+}
+
+/* ── Your Models section ──────────────────────────────────────────────────── */
+.modelsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.modelsSection h4 {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.modelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.modelCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.modelCard:hover {
+  background: var(--bg-hover, #64ace7);
+}
+
+.modelCardSelected {
+  border-color: var(--primary, #1e88e5);
+  background: var(--bg-selected, #64ace7);
+}
+
+/* ── Model template charts (right panel) ──────────────────────────────────── */
+.modelCharts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.modelChartsTitle {
+  margin: 0 0 0.75rem 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.modelCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modelCardActions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.modelName {
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.modelGestureList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.modelGestureItem {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--color, #333);
+}
+
+/* ── Template generation checkbox ─────────────────────────────────────────── */
+.templateCheckbox {
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--primary, #1e88e5);
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+/* ── Misc ─────────────────────────────────────────────────────────────────── */
+.emptyMsg {
+  font-size: 0.8rem;
+  color: var(--color-muted, #999);
+  margin: 0;
+}
+
+/* ── Gesture summary — expandable classes ────────────────────────────────── */
+.classGroup {
+  display: flex;
+  flex-direction: column;
+}
+
+.recordingList {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 0 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border-left: 2px solid var(--border, #ddd);
+  margin-left: 0.9rem;
+  margin-bottom: 0.25rem;
+}
+
+.recordingItem {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.recordingItem:hover {
+  background: var(--bg-hover, #f0f0f0);
+}
+
+.recordingItem.active {
+  border: 1px solid var(--primary, #1e88e5);
+  background: var(--bg-selected, #64ace7);
+}
+
+.recordingMeta {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recordingMeta .sampleCount {
+  color: var(--color-muted, #888);
+  font-size: 0.72rem;
+}
+
+.btnView {
+  padding: 0.1rem 0.3rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  border: 1px solid var(--border, #ccc);
+  background: transparent;
+  color: var(--primary, #1e88e5);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btnView:hover {
+  background: var(--bg-selected, #e3f2fd);
+}
+
+.btnDanger {
+  padding: 0.1rem 0.35rem;
+  font-size: 0.8rem;
+  line-height: 1;
+  border-radius: 3px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-muted, #999);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.btnDanger:hover {
+  color: #e53935;
+  border-color: #e53935;
+}
+
+/* From main branch — used by the raw data scroll view */
+.scroll-container {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 0 1rem;
+  margin: 1rem;
+  max-height: 10rem;
+  font-size: xx-small;
+}
+
+.scroll-item {
+  font-family: monospace;
+}
+
+/* Legacy classes kept for compatibility */
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: 0.8rem;
+  font-weight: light;
+}
+
+.value {
+  font-size: 1.1rem;
+  font-weight: bold;
+  width: 5rem;
+  text-align: right;
+}

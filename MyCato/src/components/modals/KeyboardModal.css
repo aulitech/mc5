@@ -1,0 +1,323 @@
+:root {
+  --kbdFontSize: .6rem;
+}
+
+
+.keyboardContainer {
+  display: flex;
+  background-color: rgba(0, 0, 0, 0.2);
+  justify-content: center;
+  width: 100%;
+  margin: 0 auto;
+  padding: .5rem;
+  border-radius: 5px;
+  gap: .5rem;
+}
+
+.simple-keyboard.hg-theme-default {
+  display: inline-block;
+}
+
+.simple-keyboard-main.simple-keyboard {
+  width: 500px;
+  min-width: 500px;
+  background: none;
+}
+
+.simple-keyboard-main.simple-keyboard .hg-row:first-child {
+  margin-bottom: 10px;
+}
+
+.simple-keyboard-arrows.simple-keyboard {
+  align-self: flex-end;
+  background: none;
+}
+
+.simple-keyboard .hg-button.selectedButton {
+  background: rgba(5, 25, 70, 0.53);
+  color: white;
+}
+
+.simple-keyboard .hg-button.emptySpace {
+  pointer-events: none;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.simple-keyboard-arrows .hg-row {
+  justify-content: center;
+}
+
+.simple-keyboard-arrows .hg-button {
+  width: 2rem;
+  flex-grow: 0;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+
+.controlArrows {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-flow: column;
+}
+
+.simple-keyboard-control.simple-keyboard {
+  background: none;
+}
+
+.simple-keyboard-control.simple-keyboard .hg-row:first-child {
+  margin-bottom: 10px;
+}
+
+.simple-keyboard-control .hg-button {
+  width: 2rem;
+  flex-grow: 0;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+
+.numPad {
+  display: flex;
+  gap: .5rem;
+  align-items: flex-end;
+}
+
+.simple-keyboard-numpad.simple-keyboard {
+  background: none;
+}
+
+.simple-keyboard-numpad.simple-keyboard {
+  width: 5rem;
+}
+
+.simple-keyboard-numpad.simple-keyboard .hg-button {
+  width: 2rem;
+  justify-content: center;
+  display: flex;
+  align-items: center;
+}
+
+.simple-keyboard-numpadEnd.simple-keyboard {
+  width: 2rem;
+  background: none;
+  margin: 0;
+  padding: 5px 5px 5px 0;
+}
+
+.simple-keyboard-numpadEnd.simple-keyboard .hg-button {
+  align-items: center;
+  justify-content: center;
+  display: flex;
+}
+
+.simple-keyboard-numpadEnd .hg-button.hg-standardBtn.hg-button-plus {
+  height: 90px;
+}
+
+.simple-keyboard-numpadEnd.simple-keyboard .hg-button.hg-button-enter {
+  height: 90px;
+}
+
+.simple-keyboard-arrows .hg-button.hg-button-arrowup {
+  flex-grow: 0;
+}
+
+#root
+.simple-keyboard.hg-theme-default .hg-button.hg-selectedButton {
+  background: rgba(5, 25, 70, 0.53);
+  color: white;
+}
+
+.hg-button.hg-functionBtn.hg-button-space {
+  width: 200px;
+}
+
+.hg-theme-default {
+  background-color: #ececec;
+  border-radius: .4rem;
+  box-sizing: border-box;
+  font-size: var(--kbdFontSize);
+  font-family:
+    HelveticaNeue-Light,
+    Helvetica Neue Light,
+    Helvetica Neue,
+    Helvetica,
+    Arial,
+    Lucida Grande,
+    sans-serif;
+  overflow: hidden;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  width: 100%;
+}
+.hg-theme-default .hg-button span,
+.hg-theme-default .hg-button span svg {
+  pointer-events: none;
+}
+.hg-theme-default button.hg-button {
+  border-width: 0;
+  font-size: inherit;
+  -moz-user-select: none;
+  user-select: none;
+}
+.hg-theme-default .hg-button {
+  display: inline-block;
+  flex-grow: 1;
+}
+.hg-theme-default .hg-row {
+  display: flex;
+}
+.hg-theme-default .hg-row:not(:last-child) {
+  margin-bottom: 5px;
+}
+.hg-theme-default .hg-row .hg-button-container,
+.hg-theme-default .hg-row .hg-button:not(:last-child) {
+  margin-right: 5px;
+}
+.hg-theme-default .hg-row > div:last-child {
+  margin-right: 0;
+}
+.hg-theme-default .hg-row .hg-button-container {
+  display: flex;
+}
+.hg-theme-default .hg-button {
+  align-items: center;
+  background: #c8c8c8;
+  border-bottom: 1px solid #b5b5b5;
+  border-radius: 5px;
+  box-shadow: 0 0 3px -1px rgba(0, 0, 0, 0.3);
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  height: 1.5rem;
+  justify-content: center;
+  text-align: center;
+  padding: 5px;
+  -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
+}
+.hg-theme-default .hg-button.hg-standardBtn {
+  width: .8rem;
+}
+.hg-theme-default .hg-button.hg-activeButton {
+  background: #efefef;
+}
+.hg-theme-default.hg-layout-numeric .hg-button {
+  align-items: center;
+  display: flex;
+
+  justify-content: center;
+  width: 33.3%;
+}
+.hg-theme-default .hg-button.hg-button-numpadadd,
+.hg-theme-default .hg-button.hg-button-numpadenter {
+  height: 3.2rem;
+}
+.hg-theme-default .hg-button.hg-button-numpad0 {
+  width: 105px;
+}
+.hg-theme-default .hg-button.hg-button-com {
+  max-width: 85px;
+}
+.hg-theme-default .hg-button.hg-standardBtn.hg-button-at {
+  max-width: 45px;
+}
+.hg-theme-default .hg-button.hg-selectedButton {
+  background: rgba(5, 25, 70, 0.53);
+  color: #fff;
+}
+.hg-theme-default .hg-button.hg-standardBtn[data-skbtn=".com"] {
+  max-width: 82px;
+}
+.hg-theme-default .hg-button.hg-standardBtn[data-skbtn="@"] {
+  max-width: 60px;
+}
+.hg-candidate-box {
+  background: #ececec;
+  border-bottom: 2px solid #b5b5b5;
+  border-radius: 5px;
+  display: inline-flex;
+  margin-top: -10px;
+  position: absolute;
+  transform: translateY(-100%);
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+}
+ul.hg-candidate-box-list {
+  display: flex;
+  flex: 1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+li.hg-candidate-box-list-item {
+  align-items: center;
+  display: flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+li.hg-candidate-box-list-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+  cursor: pointer;
+}
+li.hg-candidate-box-list-item:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+.hg-candidate-box-prev:before {
+  content: "◄";
+}
+.hg-candidate-box-next:before {
+  content: "►";
+}
+.hg-candidate-box-next,
+.hg-candidate-box-prev {
+  align-items: center;
+  color: #969696;
+  cursor: pointer;
+  display: flex;
+  padding: 0 10px;
+}
+.hg-candidate-box-next {
+  border-bottom-right-radius: 5px;
+  border-top-right-radius: 5px;
+}
+.hg-candidate-box-prev {
+  border-bottom-left-radius: 5px;
+  border-top-left-radius: 5px;
+}
+.hg-candidate-box-btn-active {
+  color: #444;
+}
+
+/* =========================================
+   KEYBOARD PICKER SPECIFIC
+   ========================================= */
+/* Fix text color for the virtual keyboard library in dark mode */
+.simple-keyboard-wrapper {
+  color: #1f2937;
+}
+
+/* React-Simple-Keyboard Dark Mode Overrides */
+[data-theme="dark"] .hg-button {
+  background: #374151 !important; /* Dark grey keys */
+  color: #f3f4f6 !important; /* White text */
+  border-bottom-color: #1f2937 !important;
+}
+
+[data-theme="dark"] .hg-button:active {
+  background: var(--primary) !important;
+}
+
+[data-theme="dark"] .hg-button.hg-selectedButton {
+  background: #c6d8f4 !important; /* Dark grey keys */
+  border: 2px solid red !important;
+  color: #f43c04 !important; /* White text */
+
+}

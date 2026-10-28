@@ -1,0 +1,62 @@
+.graph-container {
+  min-width: 30rem;
+  width: 100%;
+  background-color: transparent;
+  border-radius: 8px;
+  user-select: none;
+  padding-bottom: 1rem;
+  aspect-ratio: 500/300;
+  position: relative;
+}
+
+.graph-internal-title {
+  fill: var(--color);
+  font-size: large;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.graph-axis-title {
+  fill: var(--color);
+  font-size: medium
+}
+
+.graph-label-text {
+  fill: var(--color);
+  font-size: medium;
+  font-weight: 700;
+}
+
+.graph-grid-line {
+  stroke: var(--color);
+  fill: none;
+  stroke-width: 2;
+}
+
+.graph-drop-line {
+  stroke: var(--color);
+  fill:none;
+  stroke-width: 2;
+  stroke-dasharray: 4;
+}
+
+.graph-curve {
+  stroke: var(--color-input);
+  stroke-width: 4;
+  fill: none;
+}
+
+.graph-handle {
+  fill: hsl(204.3 51.6% 70%);
+  stroke: white;
+  stroke-width: 2;
+  cursor: grab;
+  transition: r 0.1s;
+}
+
+.graph-handle:active {
+  cursor: grabbing;
+  r: 10;
+}
