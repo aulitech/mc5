@@ -7,8 +7,6 @@ const TestsTab = () => {
           These external tools can help you test and improve your pointing and
           typing skills when using Cato.
         </p>
-        <p />
-
         <p>Selecting these links will open the tools in a new browser tab. Return here to adjust settings while using the tools.</p>
       </div>
       <div
@@ -19,10 +17,10 @@ const TestsTab = () => {
           padding: "0 2rem 2rem 2rem",
         }}
       >
-        <a target="_blank" href="https://neuralink.com/webgrid/">
+        <a target="_blank" rel="noopener noreferrer" href="https://neuralink.com/webgrid/">
           Webgrid
         </a>
-        <a target="_blank" href="https://monkeytype.com/">
+        <a target="_blank" rel="noopener noreferrer" href="https://monkeytype.com/">
           MonkeyType
         </a>
       </div>

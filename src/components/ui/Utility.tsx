@@ -1,4 +1,20 @@
 // ui utility components
+import type { CSSProperties, ReactNode } from "react";
+import styles from "./Ring.module.css";
+
+interface ProgressProps {
+  label: ReactNode;
+  /** 0–100. */
+  value: number;
+  color?: string;
+  bgColor?: string;
+  width?: string;
+  gap?: string;
+  trackStyle?: CSSProperties;
+  barStyle?: CSSProperties;
+}
+
+// progress bar with label
 const Progress = ({
   label,
   value,
@@ -6,16 +22,15 @@ const Progress = ({
   bgColor = "gray",
   width = "100%",
   gap = "1rem",
-  ...props
-}) => (
-  <div // progress bar with label component
-    onClick={props.onClick}
+  trackStyle,
+  barStyle,
+}: ProgressProps) => (
+  <div
     style={{
       display: "flex",
       flexDirection: "row",
       justifyContent: "center",
       width: width,
-      cursor: "pointer",
       gap: gap,
     }}
   >
@@ -28,13 +43,18 @@ const Progress = ({
       }}
     >
       <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={value}
+        aria-label={typeof label === "string" ? label : undefined}
         style={{
           // progress bar container - set min width to prevent collapse
           minWidth: "8rem",
           width: "25%",
           height: "100%",
           backgroundColor: bgColor,
-          ...props.trackStyle,
+          ...trackStyle,
         }}
       >
         <div
@@ -42,7 +62,7 @@ const Progress = ({
             width: `${value}%`,
             backgroundColor: color,
             height: "100%",
-            ...props.barStyle,
+            ...barStyle,
           }}
         ></div>
       </div>
@@ -59,101 +79,76 @@ const Progress = ({
   </div>
 );
 
-const CommandButton = ({ label, ...props }) => (
-  <button
-    onClick={props.onClick}
-    title={props.tip || ""}
-    style={{
-      ...props.style,
-    }}
-  >
-    {label}
-  </button>
-);
+interface StackProps {
+  children?: ReactNode;
+  style?: CSSProperties;
+  className?: string;
+}
 
-const HStack = ({ children, ...props }) => (
+const HStack = ({ children, style, className }: StackProps) => (
   <div
+    className={className}
     style={{
       display: "flex",
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      ...props.style,
+      ...style,
     }}
   >
     {children}
   </div>
 );
 
-const VStack = ({ children, ...props }) => (
+const VStack = ({ children, style, className }: StackProps) => (
   <div
+    className={className}
     style={{
       display: "flex",
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
-      ...props.style,
+      ...style,
     }}
   >
     {children}
   </div>
 );
 
-const Stack = ({ children, ...props }) => (
-  <div style={{ display: "flex", flexDirection: "column", ...props.style }}>
-    {children}
-  </div>
-);
+interface TextProps {
+  fontSize?: CSSProperties["fontSize"];
+  fontWeight?: CSSProperties["fontWeight"];
+  color?: string;
+  children?: ReactNode;
+  style?: CSSProperties;
+}
+
 const Text = ({
   fontSize = "medium",
   fontWeight = "normal",
   color = "white",
   children,
-  ...props
-}) => (
+  style,
+}: TextProps) => (
   <span
     style={{
       fontSize: fontSize,
       fontWeight: fontWeight,
       color: color,
-      ...props.style,
+      ...style,
     }}
   >
     {children}
   </span>
 );
 
-const Code = ({
-  background = "gray",
-  padding = "1rem",
-  children,
-  ...props
-}) => (
-  <pre
-    style={{
-      background: background,
-      padding: padding,
-      ...props.style,
-    }}
-  >
-    {children}
-  </pre>
-);
-
-const Mark = ({ children, ...props }) => (
-  <mark
-    style={{
-      backgroundColor: props.color || "yellow",
-      padding: "2px 4px",
-      borderRadius: "2px",
-      ...props.style,
-    }}
-  >
-    {children}
-  </mark>
-);
-
-import styles from "./Ring.module.css";
+interface RingProps {
+  size?: number;
+  color?: string;
+  speed?: number;
+  stroke?: number;
+  bgOpacity?: number;
+}
 
 const Ring = ({
   size = 40,
@@ -161,21 +156,23 @@ const Ring = ({
   speed = 2,
   stroke = 5,
   bgOpacity = 0,
-}) => {
-  const sizeInt = parseInt(size + "");
-  const strokeInt = parseInt(stroke + "");
-  const centerPoint = sizeInt / 2;
-  const radius = Math.max(0, sizeInt / 2 - strokeInt / 2);
+}: RingProps) => {
+  const centerPoint = size / 2;
+  const radius = Math.max(0, size / 2 - stroke / 2);
 
   return (
     <div
       className={styles["ring-container"]}
-      style={{
-        "--uib-size": size + "px",
-        "--uib-color": color,
-        "--uib-speed": speed + "s",
-        "--uib-bg-opacity": bgOpacity + "",
-      }}
+      role="status"
+      aria-label="Loading"
+      style={
+        {
+          "--uib-size": size + "px",
+          "--uib-color": color,
+          "--uib-speed": speed + "s",
+          "--uib-bg-opacity": bgOpacity + "",
+        } as CSSProperties
+      }
     >
       <svg
         className={styles["ring-inner"]}
@@ -206,14 +203,4 @@ const Ring = ({
   );
 };
 
-export {
-  Progress,
-  CommandButton,
-  HStack,
-  VStack,
-  Stack,
-  Text,
-  Code,
-  Mark,
-  Ring,
-};
+export { Progress, HStack, VStack, Text, Ring };

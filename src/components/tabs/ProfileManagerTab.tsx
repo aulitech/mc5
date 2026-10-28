@@ -1,9 +1,9 @@
-import React from "react";
 import { Plus } from "lucide-react";
 import { useConfig } from "../../context/ConfigContext";
 import { useDevice } from "../../context/DeviceContext";
 import { useSettings } from "../../context/SettingsContext";
-import ProfileContainer from "../tabs/ProfileContainer";
+import ProfileContainer from "./ProfileContainer";
+
 const ProfileManagerTab = () => {
   const { data, addConfigItem } = useConfig();
   const { status } = useDevice();
@@ -11,13 +11,8 @@ const ProfileManagerTab = () => {
 
   if (!data) return null;
 
-  const filteredData = () => {
-    if (isAdvanced) {
-      return data?.profiles?.map((_, index) => index);
-    } else {
-      return [status?.conIdx ?? 0];
-    }
-  };
+  // Advanced mode shows every profile; otherwise just the active one.
+  const visible = isAdvanced ? data.profiles.map((_, index) => index) : [status?.conIdx ?? 0];
 
   return (
     <div
@@ -48,7 +43,7 @@ const ProfileManagerTab = () => {
         </div>
       )}
       <div style={{ display: "flex", flexDirection: "row", gap: "1rem" }}>
-        {filteredData()?.filter((i) => data.profiles[i]).map((profileIdx) => (
+        {visible.filter((i) => data.profiles[i]).map((profileIdx) => (
           <ProfileContainer
             key={profileIdx}
             index={profileIdx}

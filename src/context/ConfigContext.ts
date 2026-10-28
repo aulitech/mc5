@@ -11,9 +11,18 @@ export interface ConfigContextValue {
   updateConfig: (path: ConfigPath, value: unknown) => Promise<boolean>;
   /** Append a copy of the array's first item (e.g. a new profile). */
   addConfigItem: (path: ConfigPath) => Promise<void>;
+  /** Delete an array item. Deleting a profile also re-points the profile map. */
   deleteConfigItem: (path: ConfigPath) => Promise<void>;
-  /** Replace the whole config (restore from backup) and push it to the device. */
-  replaceConfig: (config: Config) => Promise<void>;
+  /**
+   * Delete an action and re-point every gesture/tap binding to match (see
+   * planActionDelete). Resolves false if nothing was deleted.
+   */
+  deleteAction: (index: number) => Promise<boolean>;
+  /**
+   * Replace the whole config (restore from backup) and push it to the device.
+   * Takes the parsed file as-is; anything that isn't a config is rejected.
+   */
+  replaceConfig: (config: unknown) => Promise<void>;
   /** Persist the device's working config to flash. */
   saveConfig: () => Promise<void>;
 }

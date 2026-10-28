@@ -1,12 +1,12 @@
-import { HStack, VStack } from "../ui/Utility";
+import { VStack } from "../ui/Utility";
 
-const MainInstructions = ({ onConnect }) => {
+const MainInstructions = ({ onConnect }: { onConnect: () => void }) => {
   return (
     <VStack
       style={{
         gap: "2rem",
         padding: "1rem 4rem",
-                maxWidth: "700px",
+        maxWidth: "700px",
         margin: "0 auto",
         overflowY: "auto",
       }}
@@ -16,7 +16,7 @@ const MainInstructions = ({ onConnect }) => {
         To get started, please have Cato powered on and paired with your
         computer, then press<button onClick={onConnect}>Connect</button>
       </p>
-    <p style={{ border:'1px solid var(--border)', padding: '0.5rem', borderRadius: '8px' }}  >
+      <p style={{ border: "1px solid var(--border)", padding: "0.5rem", borderRadius: "8px" }}>
         Pre-Release Users: Access the older MyCato version{" "}
         <a href="https://aulitech.github.io/mc/">here</a>. We recommend updating to the latest version for the best experience and access to new features at <a href="https://AULI.TECH/support/">AULI.TECH Support</a>.
       </p>

@@ -2,7 +2,8 @@
 
 ## Supported Versions
 
-Currently being supported with security updates.
+Security fixes go into the latest release of MyCato (the version deployed at
+mc.AULI.TECH).
 
 | Version | Supported          |
 | ------- | ------------------ |
@@ -11,8 +12,8 @@ Currently being supported with security updates.
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
-
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+Please report vulnerabilities privately through GitHub's **Report a
+vulnerability** button on this repository's **Security** tab, rather than in a
+public issue. Include steps to reproduce and the browser and Cato firmware
+version if relevant. We'll acknowledge the report and keep you updated in that
+advisory until it's resolved.

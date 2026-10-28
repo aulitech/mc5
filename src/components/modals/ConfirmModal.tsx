@@ -1,45 +1,50 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 
-const ConfirmModal = ({ isOpen, onClose, onConfirm, children }) => {
-  const modalRef = useRef(null);
+interface ConfirmModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  children?: ReactNode;
+}
+
+const FOCUSABLE = "input, select, textarea, button";
+
+const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProps) => {
+  const modalRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      // Use a timeout to allow the component to mount before starting the animation
-      const timer = setTimeout(() => setIsAnimating(true), 10);
-      return () => clearTimeout(timer);
-    } else {
-      const timer = setTimeout(() => setIsAnimating(false), 0);
-      return () => clearTimeout(timer);
-    }
+    // Delay the "in" state a tick so the opacity/transform transition runs.
+    const timer = setTimeout(() => setIsAnimating(isOpen), isOpen ? 10 : 0);
+    return () => clearTimeout(timer);
+  }, [isOpen]);
+
+  // Focus the first control on open; keep Tab inside the dialog.
+  useEffect(() => {
+    if (!isOpen) return;
+    modalRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
   }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen) return;
-
     const modalNode = modalRef.current;
     if (!modalNode) return;
 
-    const focusableElements = modalNode.querySelectorAll("input, button");
-    const firstElement = focusableElements[0];
-    const lastElement = focusableElements[focusableElements.length - 1];
-
-    firstElement?.focus();
-
-    const handleKeyDown = (event) => {
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
-      } else if (event.key === "Tab") {
-        if (event.shiftKey) {
-          if (document.activeElement === firstElement) {
-            lastElement.focus();
-            event.preventDefault();
-          }
-        } else if (document.activeElement === lastElement) {
-          firstElement.focus();
-          event.preventDefault();
-        }
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = modalNode.querySelectorAll<HTMLElement>(FOCUSABLE);
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        last?.focus();
+        event.preventDefault();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        first?.focus();
+        event.preventDefault();
       }
     };
 
@@ -49,7 +54,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }) => {
 
   if (!isOpen) return null;
 
-  const modalOverlayStyle = {
+  const modalOverlayStyle: CSSProperties = {
     position: "fixed",
     top: 0,
     left: 0,
@@ -64,7 +69,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }) => {
     transition: "opacity 200ms ease-in-out",
   };
 
-  const modalStyle = {
+  const modalStyle: CSSProperties = {
     backgroundColor: "var(--bg-card)",
     padding: "2rem",
     borderRadius: "8px",

@@ -8,16 +8,38 @@ import {
   initialResponseState,
   normalizeGestureList,
   parseStatus,
+  responseText,
+  type ResponseState,
 } from "./protocol";
 
 // Build a feature report as the device returns it:
 // [reportId, 0x00, 0xFF, msgType, lenLSB, lenMSB, ...payload]
-function responseReport(msgType: number, length: number, payload: string) {
+function responseReport(msgType: number, length: number, payload: string | Uint8Array) {
   const bytes = new Uint8Array(OTA_FR.read.headerLength + 238);
   bytes.set([OTA_FR.id, 0x00, 0xff, msgType, length & 0xff, (length >> 8) & 0xff]);
-  bytes.set(new TextEncoder().encode(payload), OTA_FR.read.headerLength);
+  bytes.set(typeof payload === "string" ? new TextEncoder().encode(payload) : payload, OTA_FR.read.headerLength);
   return new DataView(bytes.buffer);
 }
+
+// Split a response into FIRST/MID reports the way the device sends it.
+function chunkedResponse(text: string, chunkSize = 238) {
+  const bytes = new TextEncoder().encode(text);
+  const reports: DataView[] = [];
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    const msgType = offset === 0 ? MSG.FIRST : MSG.MID;
+    reports.push(responseReport(msgType, bytes.length - offset, bytes.slice(offset, offset + chunkSize)));
+  }
+  return reports;
+}
+
+const decodeAll = (reports: DataView[]) => {
+  let state: ResponseState = initialResponseState();
+  for (const report of reports) {
+    state = applyResponseChunk(state, report);
+    if (state.remaining === 0) break;
+  }
+  return state;
+};
 
 function practiceReport(ts: number, latched: number, slots: number[]) {
   const view = new DataView(new ArrayBuffer(5 + slots.length * 2));
@@ -54,7 +76,8 @@ describe("encodeCommand", () => {
 describe("applyResponseChunk", () => {
   it("returns a single RESULT", () => {
     const state = applyResponseChunk(initialResponseState(), responseReport(MSG.RESULT, 7, '{"a":1}'));
-    expect(state).toEqual({ remaining: 0, data: '{"a":1}', error: null });
+    expect(state.remaining).toBe(0);
+    expect(responseText(state)).toBe('{"a":1}');
   });
 
   it("accumulates FIRST/MID chunks until the length is satisfied", () => {
@@ -62,7 +85,26 @@ describe("applyResponseChunk", () => {
     let state = applyResponseChunk(initialResponseState(), responseReport(MSG.FIRST, full.length, full.slice(0, 238)));
     expect(state.remaining).toBe(3);
     state = applyResponseChunk(state, responseReport(MSG.MID, 3, "bcd"));
-    expect(state).toEqual({ remaining: 0, data: full, error: null });
+    expect(state.remaining).toBe(0);
+    expect(state.error).toBeNull();
+    expect(responseText(state)).toBe(full);
+  });
+
+  it("decodes multi-byte UTF-8 by byte length, without trailing padding", () => {
+    const text = '{"name":"Mañana ☕"}';
+    const state = decodeAll(chunkedResponse(text));
+    expect(state.remaining).toBe(0);
+    expect(responseText(state)).toBe(text);
+  });
+
+  it("keeps a multi-byte character that straddles two reports intact", () => {
+    // 'é' is 2 bytes; an odd-length prefix puts one split across the boundary.
+    const text = JSON.stringify({ name: "xx" + "é".repeat(150) }); // 11-byte prefix
+    const reports = chunkedResponse(text);
+    expect(reports).toHaveLength(2);
+    const state = decodeAll(reports);
+    expect(state.remaining).toBe(0);
+    expect(responseText(state)).toBe(text);
   });
 
   it("keeps waiting after ACK_RSP and records NACK errors", () => {

@@ -1,32 +1,11 @@
-// schemas.ts — Plain data describing the config: action metadata, a sample
-// default config, and the UI schema that drives the recursive config tree
+// schemas.ts — Plain data describing the config: a sample default config,
+// and the UI schema that drives the recursive config tree
 // (labels, visibility, input types, ranges). No React or device imports —
 // anything runtime (gesture names, custom editors) is passed in or looked up
 // by name in the tree components.
 
-import {
-  RefreshCw,
-  Moon,
-  Coffee,
-  Layers,
-  Bluetooth,
-  BluetoothOff,
-  Move3D,
-  ChartPie,
-  ArrowDownToLine,
-  BookDown,
-  type LucideIcon,
-} from "lucide-react";
-
 import { ORIENTATION_OPTS } from "./mappings";
 import type { Config } from "../types/config";
-
-export interface ActionSchemaEntry {
-  label: string;
-  icon: LucideIcon;
-  description: string;
-  argsStructure: "flat" | "button_complex" | "scroll_complex";
-}
 
 export interface SchemaOption {
   value: string | number;
@@ -56,69 +35,7 @@ export interface SchemaNode {
   [key: string]: unknown;
 }
 
-export const ACTION_SCHEMA: Record<string, ActionSchemaEntry> = {
-  noop: {
-    label: "Do Nothing",
-    icon: Coffee,
-    description: "No operation placeholder.",
-    argsStructure: "flat",
-  },
-  button: {
-    label: "Press/Click",
-    icon: ArrowDownToLine,
-    description: "Simulate a mouse click or keyboard press.",
-    argsStructure: "button_complex",
-  },
-  dwell_click: {
-    label: "Dwell Click",
-    icon: BookDown,
-    description: "Routine: Left Click on dwell. Gesture to Toggle.",
-    argsStructure: "flat",
-  },
-  scroll: {
-    label: "Scroll Window",
-    icon: Layers,
-    description: "Scroll the active window.",
-    argsStructure: "scroll_complex",
-  },
-  pointer_sleep: {
-    label: "Sleep-Gesture",
-    icon: Moon,
-    description: "Pause cursor movement. Gesture to wake.",
-    argsStructure: "flat",
-  },
-  sleep: {
-    label: "Sleep-Motion",
-    icon: Move3D,
-    description: "Low power mode. Motion/Tap wakes.",
-    argsStructure: "flat",
-  },
-  deep_sleep: {
-    label: "Sleep-Button",
-    icon: ChartPie,
-    description: "Ultra-low power. Button only wakeup.",
-    argsStructure: "flat",
-  },
-  reboot_cato: {
-    label: "Reboot Device",
-    icon: RefreshCw,
-    description: "Restart the Cato hardware.",
-    argsStructure: "flat",
-  },
-  erase_connection: {
-    label: "Erase Bond",
-    icon: BluetoothOff,
-    description: "Erase saved BLE Bond data.",
-    argsStructure: "flat",
-  },
-  next_connection: {
-    label: "Next Connection",
-    icon: Bluetooth,
-    description: "Increment to next BLE Peer ID.",
-    argsStructure: "flat",
-  },
-};
-
+/** A representative device config — shape reference and test fixture. */
 export const CONFIG_DATA: Config = {
   global_info: {
     name: "",

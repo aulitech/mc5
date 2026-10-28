@@ -69,8 +69,10 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
         const id = await db.saveRecording(gestureName, samples);
         await Promise.all([refreshCounts(), reloadClass(gestureName)]);
         setSelection({ kind: "recording", id, gestureName, samples });
+        return true;
       } catch (err) {
         fail("save the recording")(err);
+        return false;
       }
     },
 
@@ -143,6 +145,7 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
       setIsGenerating(true);
       const gestures: Record<string, ModelGesture> = {};
       const skipped: string[] = [];
+      const clashes: string[] = [];
 
       for (const gestureName of checkedClasses) {
         try {
@@ -163,6 +166,12 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
       // build one from, so just load and attach it directly.
       for (const id of checkedStandards) {
         const label = STANDARD_GESTURES.find((g) => g.id === id)?.label ?? id;
+        // A model's classes are keyed by name; don't let a standard gesture
+        // silently replace a recorded class that has the same one.
+        if (gestures[label]) {
+          clashes.push(label);
+          continue;
+        }
         try {
           const template = await loadStandardGestureTemplate(id);
           gestures[label] = { template, keptCount: 1, totalCount: 1 };
@@ -175,6 +184,11 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
       if (skipped.length > 0) {
         notify.error(
           `Left out of the model: ${skipped.join(", ")}. Recordings need the whole gesture inside the capture window.`,
+        );
+      }
+      if (clashes.length > 0) {
+        notify.error(
+          `Standard ${clashes.join(", ")} left out: a recorded gesture already has that name. Rename one to include both.`,
         );
       }
 

@@ -4,8 +4,8 @@ import { useOtaEvent } from "../../device/useOtaEvent";
 import { useDevice } from "../../context/DeviceContext";
 import { errorMessage, notify } from "../../lib/notify";
 import type { GestureScore, PracticeInference } from "../../types/device";
-import PracticeInstructions from "../help/PracticeInstructions.jsx";
-import { VStack, HStack, Text, Progress } from "../ui/Utility.jsx";
+import PracticeInstructions from "../help/PracticeInstructions";
+import { VStack, HStack, Text, Progress } from "../ui/Utility";
 
 const findScore = (scores: GestureScore[] | undefined, label: string): GestureScore =>
   scores?.find((g) => g.label === label) ?? { label: "Unknown", confidence: 0, threshold: false };
