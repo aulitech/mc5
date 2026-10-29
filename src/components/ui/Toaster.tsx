@@ -44,6 +44,17 @@ const Toaster = () => {
           }}
         >
           <span style={{ flex: 1, overflowWrap: "anywhere" }}>{t.message}</span>
+          {t.action && (
+            <button
+              className="btn-primary"
+              onClick={() => {
+                dismiss(t.id);
+                t.action!.onClick();
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
           <button className="btn-ghost" onClick={() => dismiss(t.id)} title="Dismiss">
             <X size={14} />
           </button>

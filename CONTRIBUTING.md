@@ -65,6 +65,16 @@ them fails. Don't skip it with `--no-verify`.
 - **Hardware**: the automated tests don't cover the device. Before a
   release, try anything touching `src/device/`, config editing, firmware
   update or the Gestures tab against a real Cato.
+- **PWA and offline**: the service worker exists only in production builds,
+  not under `npm run dev`. To test installing, offline use or the update
+  prompt, run `npm run build && npm run preview` (http://localhost:4173).
+  - In Chrome DevTools, use **Application → Service workers** with
+    **Offline** ticked.
+  - To see the update prompt, rebuild while the preview page is open, then
+    reload it once.
+  - Files added to `public/` are precached automatically if their extension
+    matches `globPatterns` in [vite.config.ts](vite.config.ts). Add the
+    extension there if it doesn't.
 - **Netlify Functions**: `npm run dev` doesn't serve the functions
   (`/api/releases`, `/api/asset`), so **Manage → Check for Updates** returns
   404 there. To test them locally, run `npx netlify dev` with `GITHUB_TOKEN`
@@ -73,6 +83,9 @@ them fails. Don't skip it with `--no-verify`.
 ## Version bumps
 
 The version in `package.json` follows two rules:
+
+Deployed versions reach installed and open copies of the app through the
+service worker's "new version available" prompt.
 
 - **Every commit to `dev` bumps the patch version** (1.0.9 → 1.0.10). Make
   the bump part of the same commit:

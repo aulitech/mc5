@@ -24,6 +24,17 @@ The pre-commit hook runs typecheck, lint, tests and the contrast check.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the `dev` → `main` workflow, version
 bumps and Netlify deploys.
 
+## Installing as an app (PWA)
+
+MyCato is a Progressive Web App. In Chrome or Edge, use the install icon in
+the address bar (or the browser menu's **Install MyCato**) to add it as a
+desktop app. After the first visit it opens offline, too. Everything except
+**Check for Updates** and the firmware download works without a network.
+
+When a new version is deployed, MyCato shows a "new version available" toast
+with a **Reload** button. Nothing reloads by itself, because a reload drops
+the connection to Cato.
+
 ## Deployment (Netlify)
 
 Netlify builds from `netlify.toml` (`npm run build`, publishes `dist`). Pushes to `main` deploy to production, `dev` has a branch deploy, and pull
@@ -49,7 +60,8 @@ src/
   types/         Shared types: device reports, config, gestures
   features/
     gestures/    Gestures tab: IndexedDB storage, template generation, store, components
-  components/    Shell, tabs, recursive config tree, modals, tools
+  components/    Shell, tabs, recursive config tree, modals, tools; ui/PwaUpdater
+                 registers the service worker and offers updates
   constants/     mappings and the UI schema (plain data)
 netlify/functions/releases.ts   Server-side firmware release lookup
 netlify/functions/asset.ts      Server-side firmware download
