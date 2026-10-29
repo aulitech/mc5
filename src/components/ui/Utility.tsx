@@ -18,8 +18,8 @@ interface ProgressProps {
 const Progress = ({
   label,
   value,
-  color = "blue",
-  bgColor = "gray",
+  color = "var(--primary)",
+  bgColor = "var(--bg-input)",
   width = "100%",
   gap = "1rem",
   trackStyle,
@@ -126,7 +126,7 @@ interface TextProps {
 const Text = ({
   fontSize = "medium",
   fontWeight = "normal",
-  color = "white",
+  color = "inherit",
   children,
   style,
 }: TextProps) => (
@@ -152,7 +152,7 @@ interface RingProps {
 
 const Ring = ({
   size = 40,
-  color = "black",
+  color = "var(--led-blue)",
   speed = 2,
   stroke = 5,
   bgOpacity = 0,

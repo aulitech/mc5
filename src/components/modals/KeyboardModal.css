@@ -304,20 +304,25 @@ li.hg-candidate-box-list-item:active {
   color: #1f2937;
 }
 
-/* React-Simple-Keyboard Dark Mode Overrides */
+/* React-Simple-Keyboard dark keys — whether dark comes from the OS or from
+   the app's theme switch. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .hg-button {
+    background: #374151 !important;
+    color: #f3f4f6 !important; /* 10:1 on the key */
+    border-bottom-color: #1f2937 !important;
+  }
+}
 [data-theme="dark"] .hg-button {
-  background: #374151 !important; /* Dark grey keys */
-  color: #f3f4f6 !important; /* White text */
+  background: #374151 !important;
+  color: #f3f4f6 !important;
   border-bottom-color: #1f2937 !important;
 }
 
-[data-theme="dark"] .hg-button:active {
+/* Pressed and held-modifier keys: accent fill, in both themes. */
+.hg-button:active,
+.hg-button.hg-selectedButton {
   background: var(--primary) !important;
-}
-
-[data-theme="dark"] .hg-button.hg-selectedButton {
-  background: #c6d8f4 !important; /* Dark grey keys */
-  border: 2px solid red !important;
-  color: #f43c04 !important; /* White text */
-
+  color: var(--color-on-primary) !important;
+  border: 2px solid var(--focus-ring) !important;
 }

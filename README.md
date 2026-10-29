@@ -11,6 +11,7 @@ npm run dev        # Vite dev server
 npm run typecheck  # tsc, strict
 npm run lint
 npm test           # Vitest unit tests
+npm run contrast   # WCAG contrast check of the light/dark theme colours
 npm run build      # typecheck + production build into dist/
 ```
 
@@ -18,7 +19,7 @@ npm run build      # typecheck + production build into dist/
 Updates** returns 404 there. To test it locally, run `npx netlify dev` with
 `GITHUB_TOKEN` set.
 
-The pre-commit hook runs typecheck, lint and tests. Bump the version when
+The pre-commit hook runs typecheck, lint, tests and the contrast check. Bump the version when
 releasing with `npm run bump-version`.
 
 ## Deployment (Netlify)
