@@ -38,36 +38,54 @@
   --grey-olive-900: hsl(120 2% 10%);
   --grey-olive-950: hsl(120 2.9% 6.9%);
 
-  /* --- LIGHT & DARK MODE VARIABLES --- */
+  /* --- LIGHT & DARK MODE VARIABLES ---
+     Every text/background pairing here is checked against WCAG contrast
+     minimums by scripts/contrast-audit.mjs (npm run contrast) — run it after
+     changing a colour, and add a pair there for any new combination. */
 
   --light-bg: var(--grey-olive-200);
-  --light-color: var(--grey-olive-700);
+  --light-color: var(--grey-olive-800);
   --light-bg-card: var(--grey-olive-200);
-  --light-color-card: var(--grey-olive-800);
+  --light-color-card: var(--grey-olive-900);
+  --light-color-muted: var(--grey-olive-700);
   --light-bg-header: var(--grey-olive-300);
-  --light-color-header: var(--grey-olive-300);
+  --light-color-header: var(--grey-olive-900);
+  --light-color-brand: var(--royal-gold-900);
   --light-bg-toolbar: var(--grey-olive-400);
-  --light-color-toolbar: var(--grey-olive-800);
-  --light-color-toolbar-active: var(--grey-olive-100);
+  --light-color-toolbar: var(--grey-olive-950);
+  --light-color-toolbar-active: var(--grey-olive-50);
   --light-bg-button: transparent;
-  --light-color-button: var(--grey-olive-700);
+  --light-color-button: var(--grey-olive-950);
   --light-bg-button-hover: var(--baltic-blue-600);
-  --light-color-button-hover: var(--grey-olive-800);
+  --light-color-button-hover: var(--grey-olive-50);
   --light-bg-button-active: var(--baltic-blue-700);
-  --light-color-button-active: var(--grey-olive-950);
+  --light-color-button-active: var(--grey-olive-50);
   --light-bg-input: var(--grey-olive-100);
-  --light-color-input: var(--grey-olive-800);
-  --light-bg-code: var(--grey-olive-600);
+  --light-color-input: var(--grey-olive-900);
+  --light-input-border: var(--grey-olive-700);
+  --light-bg-hover: var(--grey-olive-300);
+  --light-bg-selected: var(--baltic-blue-200);
+  --light-primary: var(--baltic-blue-700);
+  --light-primary-hover: var(--baltic-blue-800);
+  --light-primary-soft: hsl(204.3 51.6% 30% / 0.25);
+  --light-color-on-primary: var(--grey-olive-50);
+  --light-focus-ring: var(--baltic-blue-800);
+  --light-bg-code: var(--grey-olive-700);
   --light-color-code: var(--grey-olive-100);
   --light-border: var(--grey-olive-600);
   --light-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --light-danger: hsl(0 75% 34%);
+  --light-success: hsl(120 75% 22%);
+  --light-led-blue: hsl(203.1 92% 30%);
 
   --dark-bg: var(--baltic-blue-950);
-  --dark-color: var(--grey-olive-500);
+  --dark-color: var(--grey-olive-300);
   --dark-bg-card: var(--grey-olive-800);
   --dark-color-card: var(--royal-gold-100);
+  --dark-color-muted: var(--grey-olive-300);
   --dark-bg-header: var(--dark-bg);
   --dark-color-header: var(--dark-color);
+  --dark-color-brand: var(--royal-gold-300);
   --dark-bg-toolbar: var(--grey-olive-900);
   --dark-color-toolbar: var(--royal-gold-100);
   --dark-color-toolbar-active: var(--royal-gold-100);
@@ -79,20 +97,34 @@
   --dark-color-button-active: var(--royal-gold-200);
   --dark-bg-input: var(--grey-olive-700);
   --dark-color-input: var(--royal-gold-300);
+  --dark-input-border: var(--grey-olive-300);
+  --dark-bg-hover: var(--grey-olive-700);
+  --dark-bg-selected: var(--baltic-blue-800);
+  --dark-primary: var(--royal-gold-400);
+  --dark-primary-hover: var(--royal-gold-300);
+  --dark-primary-soft: hsl(46.9 99% 60% / 0.3);
+  --dark-color-on-primary: var(--grey-olive-950);
+  --dark-focus-ring: var(--royal-gold-300);
   --dark-bg-code: var(--grey-olive-700);
   --dark-color-code: var(--royal-gold-200);
-  --dark-border: var(--grey-olive-600);
+  --dark-border: var(--grey-olive-500);
   --dark-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
+  --dark-danger: hsl(0 90% 74%);
+  --dark-success: hsl(120 55% 55%);
+  --dark-led-blue: hsl(203.1 92% 62%);
 
   --bg: light-dark(var(--light-bg), var(--dark-bg));
   --color: light-dark(var(--light-color), var(--dark-color));
   --bg-card: light-dark(var(--light-bg-card), var(--dark-bg-card));
   --color-card: light-dark(var(--light-color-card), var(--dark-color-card));
+  /* Secondary text: hints, counts, timestamps. */
+  --color-muted: light-dark(var(--light-color-muted), var(--dark-color-muted));
   --bg-header: light-dark(var(--light-bg-header), var(--dark-bg-header));
   --color-header: light-dark(
     var(--light-color-header),
     var(--dark-color-header)
   );
+  --color-brand: light-dark(var(--light-color-brand), var(--dark-color-brand));
   --bg-toolbar: light-dark(var(--light-bg-toolbar), var(--dark-bg-toolbar));
   --color-toolbar: light-dark(
     var(--light-color-toolbar),
@@ -125,17 +157,44 @@
   );
   --bg-input: light-dark(var(--light-bg-input), var(--dark-bg-input));
   --color-input: light-dark(var(--light-color-input), var(--dark-color-input));
+  --input-border: light-dark(var(--light-input-border), var(--dark-input-border));
+  /* Rows and list items: under the pointer, and chosen. */
+  --bg-hover: light-dark(var(--light-bg-hover), var(--dark-bg-hover));
+  --bg-selected: light-dark(var(--light-bg-selected), var(--dark-bg-selected));
+  /* Accent: selection outlines, primary buttons, input focus. */
+  --primary: light-dark(var(--light-primary), var(--dark-primary));
+  --primary-hover: light-dark(var(--light-primary-hover), var(--dark-primary-hover));
+  --primary-soft: light-dark(var(--light-primary-soft), var(--dark-primary-soft));
+  --color-on-primary: light-dark(var(--light-color-on-primary), var(--dark-color-on-primary));
+  --focus-ring: light-dark(var(--light-focus-ring), var(--dark-focus-ring));
   --bg-code: light-dark(var(--light-bg-code), var(--dark-bg-code));
   --color-code: light-dark(var(--light-color-code), var(--dark-color-code));
   --border: light-dark(var(--light-border), var(--dark-border));
   --shadow-sm: light-dark(var(--light-shadow-sm), var(--dark-shadow-sm));
-  --color-disabled: light-dark(var(--grey-olive-400), var(--grey-olive-600));
+  --color-disabled: light-dark(var(--grey-olive-500), var(--grey-olive-400));
+  /* Disabled input background. */
+  --bg-app: light-dark(var(--grey-olive-300), var(--grey-olive-900));
+  --led-off: light-dark(var(--grey-olive-500), var(--grey-olive-600));
+  --tooltip-bg: light-dark(var(--grey-olive-900), var(--grey-olive-50));
+  --tooltip-color: light-dark(var(--grey-olive-50), var(--grey-olive-950));
 
-  /* Fixed color variables */
+  /* 3D gesture viewer panel — dark in both themes (see GestureVisualizer). */
+  --viz-bg: var(--baltic-blue-900);
+  --viz-color: var(--grey-olive-200);
+  /* Template chart X / Y / Z lines (Okabe–Ito hues, shaded per theme). */
+  --chart-1: light-dark(#005a8c, #56b4e9);
+  --chart-2: light-dark(#8a4a00, #e69f00);
+  --chart-3: light-dark(#8e3b73, #f0a6ca);
 
-  --led-blue: hsl(203.1 92% 56%);
-  --danger: hsl(0 78% 60%);
-  --success: hsl(120 70% 40%);
+  /* Old names still used by some components. */
+  --text-main: var(--color-card);
+  --text-sub: var(--color-muted);
+
+  /* Status colours — a deeper shade on light surfaces, a lighter one on dark. */
+  --led-blue: light-dark(var(--light-led-blue), var(--dark-led-blue));
+  --danger: light-dark(var(--light-danger), var(--dark-danger));
+  --success: light-dark(var(--light-success), var(--dark-success));
+  --warning: light-dark(hsl(30 100% 23%), hsl(45 95% 60%));
 }
 
 /* --- RESETS & GLOBAL --- */
@@ -216,7 +275,7 @@ button.active {
 
 .tab.active {
   background-color: var(--bg-card);
-  color: var(--color-button-active);
+  color: var(--color-card);
   border-bottom: 1px solid var(--bg-card);
   border-left: none;
   border-right: none;
@@ -255,6 +314,6 @@ body {
 }
 
 .indicator.active {
-  background-color: var(--bg-input);
+  background-color: var(--bg-card);
   color: var(--danger);
 }

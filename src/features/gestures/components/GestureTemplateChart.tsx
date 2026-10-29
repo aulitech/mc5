@@ -20,8 +20,9 @@ const CHART_H = MARGIN.top + PANEL_H + GAP + PANEL_H + MARGIN.bottom;
 
 // X, Y, Z — blue / orange / reddish purple from the Okabe–Ito palette, which
 // stays distinguishable with the common forms of colour blindness (unlike
-// red/green), and reads on both light and dark backgrounds.
-const COLORS = ["#0072B2", "#E69F00", "#CC79A7"];
+// red/green). Shaded per theme in index.css (--chart-1..3) to keep 3:1
+// against the panel.
+const COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"];
 const PANEL_FILL = "var(--bg-input)";
 const PANEL_STROKE = "var(--border)";
 const TEXT_FILL = "var(--color-card)";
@@ -67,7 +68,7 @@ function YTicks({ x, panelTop, panelH, min, max }: { x: number; panelTop: number
   return (
     <>
       {ticks.map(({ y, val }) => (
-        <text key={val} x={x} y={y} textAnchor="end" fontSize={8} fill={TEXT_FILL} opacity={0.7}>
+        <text key={val} x={x} y={y} textAnchor="end" fontSize={8} fill={TEXT_FILL}>
           {val.toFixed(1)}
         </text>
       ))}
@@ -104,7 +105,7 @@ export default function GestureTemplateChart({ template, gestureName }: { templa
         <rect x={MARGIN.left} y={gyroTop} width={plotW} height={PANEL_H} fill={PANEL_FILL} stroke={PANEL_STROKE} />
         <text
           transform={`translate(11, ${gyroTop + PANEL_H / 2}) rotate(-90)`}
-          textAnchor="middle" fontSize={9} fill={TEXT_FILL} opacity={0.7}
+          textAnchor="middle" fontSize={9} fill={TEXT_FILL}
         >
           Gyro (d/s)
         </text>
@@ -123,7 +124,7 @@ export default function GestureTemplateChart({ template, gestureName }: { templa
         <rect x={MARGIN.left} y={accTop} width={plotW} height={PANEL_H} fill={PANEL_FILL} stroke={PANEL_STROKE} />
         <text
           transform={`translate(11, ${accTop + PANEL_H / 2}) rotate(-90)`}
-          textAnchor="middle" fontSize={9} fill={TEXT_FILL} opacity={0.7}
+          textAnchor="middle" fontSize={9} fill={TEXT_FILL}
         >
           Accel (m/s²)
         </text>
@@ -139,7 +140,7 @@ export default function GestureTemplateChart({ template, gestureName }: { templa
         ))}
 
         {/* X-axis label */}
-        <text x={CHART_W / 2} y={CHART_H - 2} textAnchor="middle" fontSize={9} fill={TEXT_FILL} opacity={0.7}>
+        <text x={CHART_W / 2} y={CHART_H - 2} textAnchor="middle" fontSize={9} fill={TEXT_FILL}>
           Sample (0–99)
         </text>
 

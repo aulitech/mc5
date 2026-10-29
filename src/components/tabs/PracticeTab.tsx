@@ -120,7 +120,7 @@ const PracticeTab = () => {
                   key={name}
                   value={score.confidence}
                   label={name}
-                  color={score.threshold ? "green" : score.confidence > 30 ? "yellow" : "red"}
+                  color={score.threshold ? "var(--success)" : score.confidence > 30 ? "var(--warning)" : "var(--danger)"}
                 />
               );
             })}

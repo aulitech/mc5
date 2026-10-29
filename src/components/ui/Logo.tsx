@@ -59,7 +59,7 @@ const Logo = ({ data, device, catoStatus }: LogoProps) => (
         </VStack>
       ) : (
         <VStack>
-        <span style={{ color: "var(--royal-gold-300)" }}>myCato</span>
+        <span style={{ color: "var(--color-brand)" }}>myCato</span>
         <span style={{ color: "var(--color-card)", fontWeight: "lighter" ,fontSize: "xx-small"}}>{version}</span>
         </VStack>
       )}

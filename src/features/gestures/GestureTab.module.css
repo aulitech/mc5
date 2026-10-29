@@ -19,12 +19,12 @@
   align-items: center;
   gap: 1rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border, #ddd);
+  border-bottom: 1px solid var(--border);
 }
 
 .streamStatus {
   font-size: 0.85rem;
-  color: var(--color-muted, #666);
+  color: var(--color-muted);
 }
 
 /* ── Two-column main layout ───────────────────────────────────────────────── */
@@ -44,7 +44,7 @@
 
 .pageSection + .pageSection {
   padding-left: 2rem;
-  border-left: 2px solid var(--border, #ddd);
+  border-left: 2px solid var(--border);
 }
 
 .pageSectionTitle {
@@ -107,9 +107,9 @@
   font-size: 0.85rem;
   padding: 0.3rem 0.5rem;
   border-radius: 4px;
-  border: 1px solid var(--border, #ccc);
-  background: var(--bg, #fff);
-  color: var(--color, #111);
+  border: 1px solid var(--input-border);
+  background: var(--bg-input);
+  color: var(--color-input);
   width: 100%;
   box-sizing: border-box;
 }
@@ -138,9 +138,9 @@
   /* 2.5s window: ~1s red start (40%) | ~1s green (40%) | ~0.5s red end (20%) */
   background: linear-gradient(
     to right,
-    #ef5350 0% 20%,
-    #43a047 20% 60%,
-    #ef5350 60% 100%
+    var(--danger) 0% 20%,
+    var(--success) 20% 60%,
+    var(--danger) 60% 100%
   );
 }
 
@@ -150,7 +150,7 @@
   top: 0;
   right: 0;
   height: 100%;
-  background: var(--bg-card, #fff);
+  background: var(--bg-card);
 }
 
 .labelStart,
@@ -158,7 +158,7 @@
   position: absolute;
   top: 10px;
   font-size: 0.62rem;
-  color: var(--color-muted, #777);
+  color: var(--color-muted);
   white-space: nowrap;
   transform: translateX(-50%);
   pointer-events: none;
@@ -170,13 +170,13 @@
 
 .sampleCount {
   font-size: 0.8rem;
-  color: var(--color-muted, #666);
+  color: var(--color-muted);
   margin: 0;
 }
 
 .savingMsg {
   font-size: 0.8rem;
-  color: var(--color-muted, #666);
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -207,9 +207,9 @@
   padding: 0.35rem 0.75rem;
   font-size: 0.85rem;
   border-radius: 4px;
-  border: 1px solid var(--border, #ccc);
-  background: var(--bg-card, #fff);
-  color: var(--color, #111);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--color);
   cursor: pointer;
 }
 
@@ -219,27 +219,27 @@
 }
 
 .btn:not(:disabled):hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--bg-hover);
 }
 
 .btnAccept {
   composes: btn;
-  border-color: #43a047;
-  color: #43a047;
+  border-color: var(--success);
+  color: var(--success);
 }
 
 .btnAccept:not(:disabled):hover {
-  background: #e8f5e9;
+  background: color-mix(in srgb, var(--success) 15%, var(--bg-card));
 }
 
 .btnReject {
   composes: btn;
-  border-color: #e53935;
-  color: #e53935;
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .btnReject:not(:disabled):hover {
-  background: #ffebee;
+  background: color-mix(in srgb, var(--danger) 15%, var(--bg-card));
 }
 
 /* ── Gesture summary ──────────────────────────────────────────────────────── */
@@ -277,12 +277,12 @@
 }
 
 .summaryItem:hover {
-  background: var(--bg-hover, #64ace7);
+  background: var(--bg-hover);
 }
 
 .summaryItem.selected {
-  border-color: var(--primary, #1e88e5);
-  background: var(--bg-selected, #64ace7);
+  border-color: var(--primary);
+  background: var(--bg-selected);
 }
 
 .gestureName {
@@ -291,15 +291,15 @@
 
 .gestureCount {
   font-size: 0.8rem;
-  color: var(--color-muted, #666);
-  background: var(--bg, #eee);
+  color: var(--color-muted);
+  background: var(--bg);
   border-radius: 10px;
   padding: 0 0.4rem;
 }
 
 /* ── Standard gestures (built-in nod/tilt templates) ──────────────────────── */
 .standardDivider {
-  border-top: 1px solid var(--border, #ddd);
+  border-top: 1px solid var(--border);
   margin: 0.5rem 0;
 }
 
@@ -307,7 +307,7 @@
   margin: 0;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--color-muted, #666);
+  color: var(--color-muted);
 }
 
 /* ── Visualizer ───────────────────────────────────────────────────────────── */
@@ -317,13 +317,18 @@
   height: 400px;
   border-radius: 4px;
   overflow: hidden;
-  /*
-  background: #fafafa;
-  border: 1px solid var(--border, #ddd);
-  */
+  /* Its own dark panel in both themes: the model's grey shading and the
+     yellow axes need a dark backdrop to stand out (see --viz-bg). */
+  background: var(--viz-bg);
+  border: 1px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Text drawn straight on the dark viewer panel (e.g. the empty-state hint). */
+.visualizerWrap > .emptyMsg {
+  color: var(--viz-color);
 }
 
 /* ── Visualizer playback controls ────────────────────────────────────────── */
@@ -335,8 +340,9 @@
   display: flex;
   gap: 0.3rem;
   align-items: center;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid var(--border, #ddd);
+  background: var(--bg-card);
+  color: var(--color-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
 }
@@ -345,28 +351,21 @@
   padding: 0.15rem 0.45rem;
   font-size: 0.75rem;
   border-radius: 3px;
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--input-border);
   background: transparent;
-  color: var(--color, #333);
+  color: var(--color-card);
   cursor: pointer;
   line-height: 1.4;
 }
 
-/* .vizControls has a fixed light background regardless of app theme, so its
-   label text needs a fixed dark color too — var(--color) can turn light in
-   dark mode, making it unreadable against this bar specifically. */
-.vizControls .checkLabel {
-  color: #333;
-}
-
 .vizBtn:hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--bg-hover);
 }
 
 .vizBtnActive {
-  border-color: var(--primary, #1e88e5);
-  color: var(--primary, #1e88e5);
-  background: var(--bg-selected, #e3f2fd);
+  border-color: var(--primary);
+  color: var(--primary);
+  background: var(--bg-selected);
 }
 
 /* ── Template chart ───────────────────────────────────────────────────────── */
@@ -377,7 +376,7 @@
 /* ── Template stats ───────────────────────────────────────────────────────── */
 .templateStats {
   font-size: 0.78rem;
-  color: var(--color-muted, #666);
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -421,12 +420,12 @@
 }
 
 .modelCard:hover {
-  background: var(--bg-hover, #64ace7);
+  background: var(--bg-hover);
 }
 
 .modelCardSelected {
-  border-color: var(--primary, #1e88e5);
-  background: var(--bg-selected, #64ace7);
+  border-color: var(--primary);
+  background: var(--bg-selected);
 }
 
 /* ── Model template charts (right panel) ──────────────────────────────────── */
@@ -473,14 +472,14 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.78rem;
-  color: var(--color, #333);
+  color: var(--color);
 }
 
 /* ── Template generation checkbox ─────────────────────────────────────────── */
 .templateCheckbox {
   flex-shrink: 0;
   cursor: pointer;
-  accent-color: var(--primary, #1e88e5);
+  accent-color: var(--primary);
   width: 1.2rem;
   height: 1.2rem;
 }
@@ -488,7 +487,7 @@
 /* ── Misc ─────────────────────────────────────────────────────────────────── */
 .emptyMsg {
   font-size: 0.8rem;
-  color: var(--color-muted, #999);
+  color: var(--color-muted);
   margin: 0;
 }
 
@@ -505,7 +504,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  border-left: 2px solid var(--border, #ddd);
+  border-left: 2px solid var(--border);
   margin-left: 0.9rem;
   margin-bottom: 0.25rem;
 }
@@ -521,12 +520,12 @@
 }
 
 .recordingItem:hover {
-  background: var(--bg-hover, #f0f0f0);
+  background: var(--bg-hover);
 }
 
 .recordingItem.active {
-  border: 1px solid var(--primary, #1e88e5);
-  background: var(--bg-selected, #64ace7);
+  border: 1px solid var(--primary);
+  background: var(--bg-selected);
 }
 
 .recordingMeta {
@@ -537,7 +536,7 @@
 }
 
 .recordingMeta .sampleCount {
-  color: var(--color-muted, #888);
+  color: var(--color-muted);
   font-size: 0.72rem;
 }
 
@@ -545,15 +544,15 @@
   padding: 0.1rem 0.3rem;
   font-size: 0.7rem;
   border-radius: 3px;
-  border: 1px solid var(--border, #ccc);
+  border: 1px solid var(--border);
   background: transparent;
-  color: var(--primary, #1e88e5);
+  color: var(--primary);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .btnView:hover {
-  background: var(--bg-selected, #e3f2fd);
+  background: var(--bg-selected);
 }
 
 .btnDanger {
@@ -563,14 +562,14 @@
   border-radius: 3px;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--color-muted, #999);
+  color: var(--color-muted);
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .btnDanger:hover {
-  color: #e53935;
-  border-color: #e53935;
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 /* From main branch — used by the raw data scroll view */

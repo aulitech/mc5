@@ -1,17 +1,17 @@
 /* --- BUTTONS --- */
 .btn-danger {
-  background: rgba(231, 76, 60, 0.1);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
   color: var(--danger);
 }
 
-/* CHANGE: Primary button is now Gold with Dark Text */
+/* Accent fill: gold with dark text in dark mode, blue with light text in light. */
 .btn-primary {
   background: var(--primary);
-  color: var(--brand-dark); /* Dark text for contrast on gold */
+  color: var(--color-on-primary);
 }
 .btn-primary:hover {
   background: var(--primary-hover);
-  color: var(--color-button-hover);
+  color: var(--color-on-primary);
 }
 
 /* Ghost buttons for headers/icons */
@@ -34,7 +34,7 @@
 }
 
 .btn-ghost:hover {
-  background-color: rgba(255, 255, 255, 0.31);
+  background-color: var(--bg-hover);
 }
 
 /* A real, focusable <button> that looks like the text around it — for rows
@@ -57,18 +57,12 @@
 button:focus-visible,
 [tabindex]:focus-visible,
 summary:focus-visible {
-  outline: 2px solid var(--led-blue);
+  outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
 
-/* Ensure it is visible in Dark Mode */
-[data-theme="dark"] .btn-ghost:hover {
-  background-color: rgba(255, 255, 255, 0.12);
-  color: white;
-}
-
 .btn-danger:hover {
-  background: rgba(239, 68, 68, 0.1);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
   color: var(--danger);
 }
 
@@ -84,8 +78,9 @@ summary:focus-visible {
   color: var(--color-input);
   transition: all 0.2s;
 }
-.input-base:focus {
-  outline: none;
+.input-base:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
 }
@@ -277,8 +272,8 @@ summary:focus-visible {
   left: 100%;
   transform: translateY(-50%);
   margin-left: 10px;
-  background-color: #1e293b;
-  color: #ffffff;
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-color);
   padding: 8px 12px;
   border-radius: 6px;
   font-size: smaller;
@@ -288,7 +283,7 @@ summary:focus-visible {
   white-space: normal;
   z-index: 9999;
   pointer-events: none;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border);
 }
 .tooltip-content::after {
   content: "";
@@ -298,7 +293,7 @@ summary:focus-visible {
   margin-top: -5px;
   border-width: 5px;
   border-style: solid;
-  border-color: transparent #1e293b transparent transparent;
+  border-color: transparent var(--tooltip-bg) transparent transparent;
 }
 .tooltip-wrapper:hover .tooltip-content,
 .tooltip-wrapper:focus-within .tooltip-content {
@@ -316,17 +311,18 @@ summary:focus-visible {
 .text-bluetooth {
   color: var(--led-blue);
 }
+/* Icon colours, mapped onto theme tokens so they keep 3:1 in both modes. */
 .text-indigo-500 {
-  color: #6366f1;
-} /* Fallback for specific color */
+  color: var(--primary);
+}
 .text-green-500 {
-  color: #22c55e;
+  color: var(--success);
 }
 .text-red-500 {
   color: var(--danger);
 }
 .text-amber-500 {
-  color: #f59e0b;
+  color: var(--warning);
 }
 .text-blue-500 {
   color: var(--led-blue);
@@ -368,9 +364,9 @@ summary:focus-visible {
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
 
-  /* Match your existing .tooltip-content styles */
-  background-color: #1e293b;
-  color: #ffffff;
+  /* Match the .tooltip-content styles */
+  background-color: var(--tooltip-bg);
+  color: var(--tooltip-color);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: smaller;
