@@ -1,11 +1,12 @@
 {
   "name": "mycato",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.0.10",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "bump-version": "npm version patch --no-git-tag-version && git add package.json",
+    "bump-version": "npm version patch --no-git-tag-version && git add package.json package-lock.json",
+    "bump-minor": "npm version minor --no-git-tag-version && git add package.json package-lock.json",
     "build": "tsc && vite build",
     "typecheck": "tsc",
     "lint": "eslint .",

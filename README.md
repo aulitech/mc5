@@ -19,13 +19,15 @@ npm run build      # typecheck + production build into dist/
 Updates** returns 404 there. To test it locally, run `npx netlify dev` with
 `GITHUB_TOKEN` set.
 
-The pre-commit hook runs typecheck, lint, tests and the contrast check. Bump the version when
-releasing with `npm run bump-version`.
+The pre-commit hook runs typecheck, lint, tests and the contrast check.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the `dev` → `main` workflow, version
+bumps and Netlify deploys.
 
 ## Deployment (Netlify)
 
-Netlify builds from `netlify.toml` (`npm run build`, publishes `dist`). Pushes to the production branch deploy automatically, and pull
-requests get deploy previews.
+Netlify builds from `netlify.toml` (`npm run build`, publishes `dist`). Pushes to `main` deploy to production, `dev` has a branch deploy, and pull
+requests get deploy previews (see [CONTRIBUTING.md](CONTRIBUTING.md#netlify-deployments)).
 
 One-time setup in the Netlify UI:
 
