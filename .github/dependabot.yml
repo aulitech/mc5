@@ -1,0 +1,17 @@
+# Dependabot version updates. Dependabot reads this file from the default
+# branch, which is `dev` — where all work happens (see CLAUDE.md).
+#
+# Version-update PRs target `dev`. Security-update PRs (enabled in repo
+# settings) always go to the default branch, so they land on `dev` too.
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # One PR for all minor/patch bumps; majors still come one at a time.
+      minor-and-patch:
+        update-types: ["minor", "patch"]

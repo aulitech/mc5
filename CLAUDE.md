@@ -46,6 +46,10 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
         └── schemas.ts      # UI schema + defaults — plain data, no React/device imports
 ```
 
+### Branches
+- **`dev`** — default branch; all work and Dependabot PRs land here.
+- **`main`** — production: Netlify deploys it to mc.AULI.TECH. Changes reach it only through a `dev` → `main` PR at release time.
+
 ### Key Concepts
 - **Device layer** — `device/ota.ts` owns the HID connection. `send()` calls are queued (never "Send in progress"); status/sensor/practice reports are events (`useOtaEvent`). It holds no config.
 - **DeviceContext / ConfigContext** — device + status vs. config data. `setConfigValue` edits locally; `updateConfig` edits and sends, rolling back if the device rejects it.
