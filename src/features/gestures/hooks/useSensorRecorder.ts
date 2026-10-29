@@ -60,3 +60,5 @@ export function useSensorRecorder(durationMs: number) {
 
   return { record, isRecording, progress };
 }
+
+export type SensorRecorder = ReturnType<typeof useSensorRecorder>;

@@ -329,6 +329,8 @@
 /* Text drawn straight on the dark viewer panel (e.g. the empty-state hint). */
 .visualizerWrap > .emptyMsg {
   color: var(--viz-color);
+  text-align: center;
+  padding: 0 2rem 3rem; /* clear of the controls bar */
 }
 
 /* ── Visualizer playback controls ────────────────────────────────────────── */
@@ -345,6 +347,7 @@
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 0.2rem 0.4rem;
+  white-space: nowrap;
 }
 
 .vizBtn {
@@ -358,8 +361,13 @@
   line-height: 1.4;
 }
 
-.vizBtn:hover {
+.vizBtn:not(:disabled):hover {
   background: var(--bg-hover);
+}
+
+.vizBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .vizBtnActive {

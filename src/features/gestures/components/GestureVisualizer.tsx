@@ -5,6 +5,11 @@
 // using the recorded IMU data — gyroscope drives rotation, accelerometer drives
 // position. The animation loops continuously so you can watch the gesture replay.
 //
+// When no recording is playing and none is being recorded, "Live" instead
+// drives the model from the device's sensor stream in real time (rotation
+// only — see the animation loop). "Reset position" returns the model to its
+// rest pose, undoing gyro drift in live mode or restarting the replay.
+//
 // The scene is built once per mount; selecting another recording only swaps
 // the samples being replayed. Playback controls (pause/play, speed) and the
 // samples reach the animation loop via refs — React state can't be read inside
@@ -16,7 +21,8 @@ import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useConfig } from "../../../context/ConfigContext";
-import type { Sample } from "../../../types/gestures";
+import { useOtaEvent } from "../../../device/useOtaEvent";
+import type { Sample, Triple } from "../../../types/gestures";
 import styles from "../GestureTab.module.css";
 
 // Three shades of yellow, one per axis — distinct enough to help judge depth
@@ -114,6 +120,9 @@ const SAMPLE_RATE_HZ = 100;
 // Cap on how much time one animation frame may catch up (e.g. after the tab
 // was hidden), so playback resumes rather than fast-forwarding.
 const MAX_FRAME_MS = 100;
+// Live samples waiting for the next animation frame are capped (e.g. while
+// the tab is hidden and frames stop); beyond this the oldest are dropped.
+const MAX_LIVE_BACKLOG = SAMPLE_RATE_HZ * 10;
 const CANVAS_SIZE = 400;
 
 // The STL is fetched and parsed once per page and shared by every mount.
@@ -134,8 +143,6 @@ interface Playback {
   frame: number;
   /** Fractional samples owed to playback (see the animation loop). */
   accum: number;
-  /** Set to put the device back at its rest pose on the next frame. */
-  needsReset: boolean;
 }
 
 function createPlayback(samples: Sample[] | null | undefined): Playback | null {
@@ -149,7 +156,7 @@ function createPlayback(samples: Sample[] | null | undefined): Playback | null {
   meanAcc[0] /= samples.length;
   meanAcc[1] /= samples.length;
   meanAcc[2] /= samples.length;
-  return { samples, meanAcc, frame: 0, accum: 0, needsReset: true };
+  return { samples, meanAcc, frame: 0, accum: 0 };
 }
 
 // Disposes every geometry/material under `root`, except ones in `keep`.
@@ -164,9 +171,13 @@ function disposeTree(root: THREE.Object3D, keep: Set<unknown>) {
 
 interface GestureVisualizerProps {
   imuData: Sample[] | null | undefined;
+  /** The device's sensor stream is running (needed for the live view). */
+  isStreaming: boolean;
+  /** A recording is in progress; the live view is unavailable meanwhile. */
+  isRecording: boolean;
 }
 
-const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
+const GestureVisualizer = ({ imuData, isStreaming, isRecording }: GestureVisualizerProps) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const { data } = useConfig();
   const usbCode = data?.global_info?.orientation?.usb;
@@ -178,11 +189,17 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
   const speedRef    = useRef(1);
   const playbackRef = useRef<Playback | null>(null);
   const restQuatRef = useRef(new THREE.Quaternion());
+  /** Set to put the device back at its rest pose (and replay at frame 0) on the next frame. */
+  const needsResetRef = useRef(true);
+  const liveRef = useRef(false);
+  /** Gyro readings received since the last frame, while live. */
+  const liveQueueRef = useRef<Triple[]>([]);
 
   // React state drives button rendering only.
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed]         = useState(1);
   const [showAxes, setShowAxes]   = useState(false);
+  const [liveWanted, setLiveWanted] = useState(false);
   const showAxesRef = useRef(showAxes);
 
   // Auto-play whenever a new recording is selected (adjusting state on a prop
@@ -191,7 +208,15 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
   if (imuData !== prevImuData) {
     setPrevImuData(imuData);
     setIsPlaying(true);
+    setLiveWanted(false);
   }
+
+  const hasData = !!imuData && imuData.length > 0;
+  const isReplaying = hasData && isPlaying;
+  // Live is offered only while nothing is replaying or being recorded; a
+  // recording pauses it, and it picks up again afterwards.
+  const canGoLive = isStreaming && !isRecording && !isReplaying;
+  const isLive = liveWanted && isStreaming && !isRecording;
 
   // Holds the axes indicator once the model has loaded, so the showAxes
   // effect can toggle it without touching the scene.
@@ -202,10 +227,30 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
   const controlsRef = useRef<OrbitControls | null>(null);
   const handleResetView = () => controlsRef.current?.reset();
 
+  const handleResetPosition = () => {
+    needsResetRef.current = true;
+  };
+
   const handleTogglePlay = () => {
     isPausedRef.current = !isPausedRef.current;
     setIsPlaying(!isPausedRef.current);
+    if (!isPausedRef.current) setLiveWanted(false); // playing replaces live
   };
+
+  const handleToggleLive = () => {
+    if (!liveWanted) {
+      isPausedRef.current = true;
+      setIsPlaying(false);
+    }
+    setLiveWanted(!liveWanted);
+  };
+
+  useOtaEvent("sensor", ({ gyro }) => {
+    if (!liveRef.current) return;
+    const queue = liveQueueRef.current;
+    queue.push([gyro.x, gyro.y, gyro.z]);
+    if (queue.length > MAX_LIVE_BACKLOG) queue.shift();
+  });
 
   const handleToggleSpeed = () => {
     const next = speedRef.current === 1 ? 0.5 : 1;
@@ -222,12 +267,21 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
   useEffect(() => {
     playbackRef.current = createPlayback(imuData);
     isPausedRef.current = false;
+    needsResetRef.current = true;
   }, [imuData]);
+
+  // Entering or leaving live view starts from the rest pose (a paused replay
+  // then resumes from its beginning).
+  useEffect(() => {
+    liveRef.current = isLive;
+    liveQueueRef.current = [];
+    needsResetRef.current = true;
+  }, [isLive]);
 
   // New orientation config → new rest pose.
   useEffect(() => {
     restQuatRef.current = computeOrientationQuaternion(usbCode, ledCode);
-    if (playbackRef.current) playbackRef.current.needsReset = true;
+    needsResetRef.current = true;
   }, [usbCode, ledCode]);
 
   // ── Scene: built once per mount ─────────────────────────────────────────
@@ -327,6 +381,27 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
       deviceGroup.quaternion.copy(restQuatRef.current);
     };
 
+    // Integrate body-frame angular velocity as a quaternion rotation rather
+    // than summing independent Euler angles — Euler axes aren't orthogonal
+    // once more than one axis is active (each later axis in the rotation
+    // order inherits a tilt from whatever the earlier axes have already
+    // accumulated), which warps the apparent rotation axis over time.
+    // Composing a small quaternion per sample and right-multiplying it onto
+    // the current orientation (i.e. applying it in the device's own local
+    // frame, matching how gyro data is measured) avoids that entirely.
+    const applyGyro = (gyro: Triple) => {
+      deltaRotVec.set(
+        THREE.MathUtils.degToRad(-gyro[0] / SAMPLE_RATE_HZ),
+        THREE.MathUtils.degToRad(gyro[1] / SAMPLE_RATE_HZ),
+        THREE.MathUtils.degToRad(-gyro[2] / SAMPLE_RATE_HZ),
+      );
+      const angle = deltaRotVec.length();
+      if (angle > 0) {
+        deltaQuat.setFromAxisAngle(deltaRotVec.normalize(), angle);
+        deviceGroup.quaternion.multiply(deltaQuat);
+      }
+    };
+
     function animate(now: number) {
       animId = requestAnimationFrame(animate);
       const elapsed = Math.min(MAX_FRAME_MS, now - lastTime);
@@ -334,14 +409,27 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
       controls.update();
 
       const pb = playbackRef.current;
-      if (!pb) return;
-      if (pb.needsReset) {
+      if (needsResetRef.current) {
         resetPose();
-        pb.frame = 0;
-        pb.accum = 0;
-        pb.needsReset = false;
+        if (pb) {
+          pb.frame = 0;
+          pb.accum = 0;
+        }
+        needsResetRef.current = false;
       }
-      if (meshGroup.children.length === 0 || isPausedRef.current) {
+
+      // Live: apply every reading that arrived since the last frame, at the
+      // device's own pace. Rotation only — with no recording to take a
+      // gravity baseline from, double-integrated acceleration would just
+      // drift the model off screen.
+      if (liveRef.current) {
+        for (const gyro of liveQueueRef.current) applyGyro(gyro);
+        liveQueueRef.current = [];
+        renderer.render(scene, camera);
+        return;
+      }
+
+      if (!pb || meshGroup.children.length === 0 || isPausedRef.current) {
         renderer.render(scene, camera);
         return;
       }
@@ -358,25 +446,7 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
         }
 
         const { acc, gyro } = pb.samples[pb.frame];
-
-        // Integrate body-frame angular velocity as a quaternion rotation rather
-        // than summing independent Euler angles — Euler axes aren't orthogonal
-        // once more than one axis is active (each later axis in the rotation
-        // order inherits a tilt from whatever the earlier axes have already
-        // accumulated), which warps the apparent rotation axis over time.
-        // Composing a small quaternion per sample and right-multiplying it onto
-        // the current orientation (i.e. applying it in the device's own local
-        // frame, matching how gyro data is measured) avoids that entirely.
-        deltaRotVec.set(
-          THREE.MathUtils.degToRad(-gyro[0] / SAMPLE_RATE_HZ),
-          THREE.MathUtils.degToRad(gyro[1] / SAMPLE_RATE_HZ),
-          THREE.MathUtils.degToRad(-gyro[2] / SAMPLE_RATE_HZ),
-        );
-        const angle = deltaRotVec.length();
-        if (angle > 0) {
-          deltaQuat.setFromAxisAngle(deltaRotVec.normalize(), angle);
-          deviceGroup.quaternion.multiply(deltaQuat);
-        }
+        applyGyro(gyro);
 
         deviceGroup.position.x += (acc[0] - pb.meanAcc[0]) / 500;
         deviceGroup.position.y += (acc[1] - pb.meanAcc[1]) / 500;
@@ -405,51 +475,84 @@ const GestureVisualizer = ({ imuData }: GestureVisualizerProps) => {
     };
   }, []);
 
-  const hasData = imuData && imuData.length > 0;
+  const showScene = hasData || isLive;
+  const emptyMsg = liveWanted && isRecording
+    ? "Live view resumes after recording."
+    : "Select a gesture to visualize, or choose Live to follow Cato in real time.";
+  const liveTitle = !isStreaming
+    ? "Waiting for the sensor stream"
+    : isRecording
+      ? "Unavailable while recording"
+      : isReplaying
+        ? "Pause the replay to go live"
+        : isLive
+          ? "Stop the live view"
+          : "Follow Cato's movement in real time";
 
   return (
     <div className={styles.visualizerWrap}>
-      {!hasData && (
-        <p className={styles.emptyMsg}>Select a gesture to visualize.</p>
-      )}
-      <div ref={mountRef} style={hasData ? undefined : { display: "none" }} />
+      {!showScene && <p className={styles.emptyMsg}>{emptyMsg}</p>}
+      <div ref={mountRef} style={showScene ? undefined : { display: "none" }} />
 
-      {hasData && (
-        <div className={styles.vizControls}>
-          <button
-            className={styles.vizBtn}
-            onClick={handleTogglePlay}
-            title={isPlaying ? "Pause" : "Play"}
-            aria-label={isPlaying ? "Pause" : "Play"}
-          >
-            {isPlaying ? "⏸" : "▶"}
-          </button>
-          <button
-            className={`${styles.vizBtn} ${speed === 0.5 ? styles.vizBtnActive : ""}`}
-            onClick={handleToggleSpeed}
-            title={speed === 0.5 ? "Normal speed" : "Slow motion"}
-            aria-pressed={speed === 0.5}
-          >
-            ½×
-          </button>
-          <button
-            className={styles.vizBtn}
-            onClick={handleResetView}
-            title="Reset camera view"
-            aria-label="Reset camera view"
-          >
-            ⟲
-          </button>
-          <label className={styles.checkLabel} title="Show the STL file's own raw X/Y/Z axes, unadjusted for the IMU's orientation">
-            <input
-              type="checkbox"
-              checked={showAxes}
-              onChange={(e) => setShowAxes(e.target.checked)}
-            />
-            Show axes
-          </label>
-        </div>
-      )}
+      <div className={styles.vizControls}>
+        {hasData && (
+          <>
+            <button
+              className={styles.vizBtn}
+              onClick={handleTogglePlay}
+              title={isPlaying ? "Pause" : "Play"}
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? "⏸" : "▶"}
+            </button>
+            <button
+              className={`${styles.vizBtn} ${speed === 0.5 ? styles.vizBtnActive : ""}`}
+              onClick={handleToggleSpeed}
+              title={speed === 0.5 ? "Normal speed" : "Slow motion"}
+              aria-pressed={speed === 0.5}
+            >
+              ½×
+            </button>
+          </>
+        )}
+        <button
+          className={`${styles.vizBtn} ${isLive ? styles.vizBtnActive : ""}`}
+          onClick={handleToggleLive}
+          disabled={!isLive && !canGoLive}
+          title={liveTitle}
+          aria-pressed={isLive}
+        >
+          Live
+        </button>
+        {showScene && (
+          <>
+            <button
+              className={styles.vizBtn}
+              onClick={handleResetPosition}
+              title="Reset position"
+              aria-label="Reset position"
+            >
+              ⌂
+            </button>
+            <button
+              className={styles.vizBtn}
+              onClick={handleResetView}
+              title="Reset camera view"
+              aria-label="Reset camera view"
+            >
+              ⟲
+            </button>
+            <label className={styles.checkLabel} title="Show the STL file's own raw X/Y/Z axes, unadjusted for the IMU's orientation">
+              <input
+                type="checkbox"
+                checked={showAxes}
+                onChange={(e) => setShowAxes(e.target.checked)}
+              />
+              Show axes
+            </label>
+          </>
+        )}
+      </div>
     </div>
   );
 };

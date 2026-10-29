@@ -4,8 +4,9 @@
 // models), and the sensor stream is on for as long as the tab is open.
 //
 // Data flow:
-//   device sensor events → useSensorRecorder (in GestureControl) → store.addRecording
-//   store.selection → GestureVisualizer
+//   device sensor events → useSensorRecorder → GestureControl → store.addRecording
+//   store.selection → GestureVisualizer (playback); device sensor events →
+//   GestureVisualizer (live view, while not recording or playing)
 //   checked classes/standard gestures → store.generateModel → ModelList
 
 import { useState } from "react";
@@ -15,13 +16,18 @@ import GestureInputs from "./components/GestureInputs";
 import GestureSummary from "./components/GestureSummary";
 import GestureVisualizer from "./components/GestureVisualizer";
 import ModelList from "./components/ModelList";
+import { useSensorRecorder } from "./hooks/useSensorRecorder";
 import { useSensorStream } from "./hooks/useSensorStream";
 import { GestureStoreProvider } from "./state/GestureStoreProvider";
 import { useGestureStore } from "./state/GestureStoreContext";
 import styles from "./GestureTab.module.css";
 
+// Length of one recording window.
+const RECORD_MS = 2500;
+
 const GestureTabContent = () => {
   const isStreaming = useSensorStream();
+  const recorder = useSensorRecorder(RECORD_MS);
   const [gestureName, setGestureName] = useState("");
   const { selection, checkedClasses, checkedStandards, isGenerating, generateModel } = useGestureStore();
   const { prompt } = useDialog();
@@ -42,7 +48,7 @@ const GestureTabContent = () => {
             {/* Column 1: inputs, record controls, saved gestures */}
             <div className={`${styles.leftPanel} ${styles.recordingsPanel}`}>
               <GestureInputs gestureName={gestureName} onChange={setGestureName} />
-              <GestureControl gestureName={gestureName} isStreaming={isStreaming} />
+              <GestureControl gestureName={gestureName} isStreaming={isStreaming} recorder={recorder} />
               <GestureSummary />
               <button
                 className={styles.btn}
@@ -53,9 +59,13 @@ const GestureTabContent = () => {
               </button>
             </div>
 
-            {/* Column 2: visualizer only */}
+            {/* Column 2: visualizer only (playback or live) */}
             <div className={styles.visualizerColumn}>
-              <GestureVisualizer imuData={selection?.samples} />
+              <GestureVisualizer
+                imuData={selection?.samples}
+                isStreaming={isStreaming}
+                isRecording={recorder.isRecording}
+              />
             </div>
           </div>
         </div>

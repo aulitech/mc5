@@ -7,23 +7,22 @@
 import { useEffect, useEffectEvent, useState } from "react";
 import { notify } from "../../../lib/notify";
 import type { Sample } from "../../../types/gestures";
-import { useSensorRecorder } from "../hooks/useSensorRecorder";
+import type { SensorRecorder } from "../hooks/useSensorRecorder";
 import { useGestureStore } from "../state/GestureStoreContext";
 import styles from "../GestureTab.module.css";
 
-// Length of one recording window.
-const RECORD_MS = 2500;
 // Pause between accept/reject and the next recording when auto-advancing.
 const AUTO_ADVANCE_DELAY_MS = 500;
 
 interface GestureControlProps {
   gestureName: string;
   isStreaming: boolean;
+  /** Owned by GestureTab so the visualizer can see when a recording runs. */
+  recorder: SensorRecorder;
 }
 
-function GestureControl({ gestureName, isStreaming }: GestureControlProps) {
+function GestureControl({ gestureName, isStreaming, recorder }: GestureControlProps) {
   const { addRecording } = useGestureStore();
-  const recorder = useSensorRecorder(RECORD_MS);
   // The last recording, awaiting Accept/Reject — with the name it was
   // recorded under, so changing the name meanwhile doesn't relabel it.
   const [captured, setCaptured] = useState<{ name: string; samples: Sample[] } | null>(null);
