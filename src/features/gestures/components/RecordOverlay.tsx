@@ -43,7 +43,7 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
 
       <div className={styles.vizRecord}>
         {phase === "idle" && (
-          <button className={styles.btn} onClick={onRecord}>
+          <button className={`${styles.btn} ${styles.vizRecordBtn}`} onClick={onRecord}>
             Record "{gestureName}"
           </button>
         )}

@@ -377,6 +377,21 @@
   pointer-events: auto;
 }
 
+/* Record lets the live model show through. It uses the viewer's own
+   (always dark) colours; at 70% the panel keeps --viz-color text above
+   4.5:1 even over the model's lightest shade. */
+.vizRecordBtn,
+.vizRecordBtn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--viz-bg) 70%, transparent);
+  border-color: color-mix(in srgb, var(--viz-color) 60%, transparent);
+  color: var(--viz-color);
+  backdrop-filter: blur(3px);
+}
+
+.vizRecordBtn:not(:disabled):hover {
+  background: color-mix(in srgb, var(--viz-bg) 85%, transparent);
+}
+
 /* Saving… — disabled but still readable over the model. */
 .vizRecord > button:disabled {
   opacity: 1;
