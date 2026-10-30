@@ -130,8 +130,8 @@ const MAX_FRAME_MS = 100;
 // the tab is hidden and frames stop); beyond this the oldest are dropped.
 const MAX_LIVE_BACKLOG = SAMPLE_RATE_HZ * 10;
 // Pane edge length: a single pane, or each of the two when comparing.
-const PANE_SIZE = 400;
-const COMPARE_PANE_SIZE = 320;
+const PANE_SIZE = 280;
+const COMPARE_PANE_SIZE = 224;
 // Where the camera starts, and returns to on "Reset camera view".
 const CAMERA_HOME = new THREE.Vector3(0, 0, 50);
 
