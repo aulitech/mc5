@@ -410,8 +410,10 @@ interface GestureVisualizerProps {
 }
 
 const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisualizerProps) => {
-  const { views, compare, setCompare, targetView, setTargetView, toggleLive, slowMotion, setSlowMotion } =
-    useGestureStore();
+  const {
+    views, compare, setCompare, targetView, setTargetView, toggleLive, slowMotion, setSlowMotion,
+    positionResets, resetPosition,
+  } = useGestureStore();
   const { data } = useConfig();
   const usbCode = data?.global_info?.orientation?.usb;
   const ledCode = data?.global_info?.orientation?.led;
@@ -479,6 +481,11 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
     liveQueueRef.current = [];
     liveResetRef.current = true;
   }, [liveIndex]);
+
+  // "Reset position" (⌂, or pressing Record) → every pane back to its rest pose.
+  useEffect(() => {
+    needsResetRef.current = true;
+  }, [positionResets]);
 
   // New orientation config → new rest pose.
   useEffect(() => {
@@ -644,9 +651,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
         </button>
         <button
           className={styles.vizBtn}
-          onClick={() => {
-            needsResetRef.current = true;
-          }}
+          onClick={resetPosition}
           title="Reset position"
           aria-label="Reset position"
         >

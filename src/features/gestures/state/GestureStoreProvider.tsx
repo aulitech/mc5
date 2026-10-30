@@ -8,6 +8,7 @@ import { errorMessage, notify } from "../../../lib/notify";
 import type { GestureModel, ModelGesture, Recording, Sample } from "../../../types/gestures";
 import * as db from "../data/gestureDB";
 import { STANDARD_GESTURES, loadStandardGestureTemplate, templateToSamples } from "../data/standardGestures";
+import { moveTo, orderGestures, renameIn } from "../lib/gestureOrder";
 import { recordingKey } from "../lib/recordingFile";
 import { buildTemplateWithOutlierRejection, preprocessRecording } from "../lib/templateGen";
 import { GestureStoreContext, VIEW_COUNT, type GestureStore, type ViewSource } from "./GestureStoreContext";
@@ -35,6 +36,8 @@ const without = <T,>(set: Set<T>, item: T) => {
 
 export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [gestureOrder, setGestureOrder] = useState<string[]>([]);
+  const [positionResets, setPositionResets] = useState(0);
   const [recordings, setRecordings] = useState<Record<string, Recording[]>>({});
   const [views, setViews] = useState<(ViewSource | null)[]>(() => Array(VIEW_COUNT).fill(null));
   const [compare, setCompareState] = useState(false);
@@ -46,12 +49,19 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
   const [models, setModels] = useState<GestureModel[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Counts and list order together, so the list never shows a class without its count.
+  const refreshCounts = async () => {
+    const [classes, saved] = await Promise.all([db.getGestureClasses(), db.getGestureOrder()]);
+    setCounts(Object.fromEntries(classes.map((c) => [c.name, c.count])));
+    setGestureOrder(orderGestures(saved, classes));
+  };
+
   useEffect(() => {
-    db.getGestureCounts().then(setCounts).catch(fail("load saved gestures"));
+    refreshCounts().catch(fail("load saved gestures"));
     db.getAllModels().then(setModels).catch(fail("load saved models"));
   }, []);
 
-  const refreshCounts = () => db.getGestureCounts().then(setCounts);
+  const saveOrder = (order: string[]) => db.saveGestureOrder(order).catch(fail("save the gesture order"));
 
   // Put a source in the target pane. Live shows in one pane at most, so
   // showing it here clears it from the other.
@@ -90,6 +100,12 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     },
 
     counts,
+    gestureOrder,
+    moveGesture: (gestureName, toIndex) => {
+      const next = moveTo(gestureOrder, gestureName, toIndex);
+      setGestureOrder(next);
+      saveOrder(next);
+    },
     recordings,
 
     loadRecordings: (gestureName) => reloadClass(gestureName).catch(fail("load recordings")),
@@ -119,6 +135,7 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     deleteClass: async (gestureName) => {
       try {
         await db.deleteGesture(gestureName);
+        await saveOrder(gestureOrder.filter((n) => n !== gestureName));
         dropClass(gestureName);
         setCheckedClasses((prev) => without(prev, gestureName));
         updateViews((v) => (v?.kind === "recording" && v.gestureName === gestureName ? null : v));
@@ -131,6 +148,7 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     renameClass: async (oldName, newName) => {
       try {
         await db.renameGesture(oldName, newName);
+        await saveOrder(renameIn(gestureOrder, oldName, newName)); // keep its place in the list
         dropClass(oldName);
         setCheckedClasses((prev) => (prev.has(oldName) ? new Set(without(prev, oldName)).add(newName) : prev));
         updateViews((v) => (v?.kind === "recording" && v.gestureName === oldName ? { ...v, gestureName: newName } : v));
@@ -200,6 +218,8 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     },
 
     toggleLive: () => showInTarget(views[targetView]?.kind === "live" ? null : { kind: "live" }),
+    positionResets,
+    resetPosition: () => setPositionResets((n) => n + 1),
     slowMotion,
     setSlowMotion,
 

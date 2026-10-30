@@ -219,6 +219,34 @@
   margin-left: auto;
 }
 
+/* Drag handle at the start of a saved gesture row. */
+.dragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1rem;
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+.dragHandle:active {
+  cursor: grabbing;
+}
+
+/* The row being dragged, and where it will land (a line above or below a row). */
+.dragging {
+  opacity: 0.5;
+}
+
+.dropBefore {
+  box-shadow: 0 -2px 0 0 var(--primary);
+}
+
+.dropAfter {
+  box-shadow: 0 2px 0 0 var(--primary);
+}
+
 /* Shows/hides a class's recordings; points down when open. */
 .disclosure {
   display: inline-flex;

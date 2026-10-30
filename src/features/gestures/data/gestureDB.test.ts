@@ -8,9 +8,12 @@ import {
   deleteRecording,
   getAllModels,
   getAllRecordings,
+  getGestureClasses,
+  getGestureOrder,
   getGestureCounts,
   getRecordingsForGesture,
   renameGesture,
+  saveGestureOrder,
   saveModel,
   saveRecording,
 } from "./gestureDB";
@@ -39,6 +42,23 @@ describe("gestureDB", () => {
       ["import-a", timestamp],
       ["import-b", timestamp],
     ]);
+  });
+
+  it("reports each class's first recording, so classes can be listed in creation order", async () => {
+    const first = await saveRecording("order-z", samples);
+    await saveRecording("order-a", samples);
+    await saveRecording("order-z", samples);
+    const classes = (await getGestureClasses()).filter((c) => c.name.startsWith("order-"));
+    const z = classes.find((c) => c.name === "order-z")!;
+    const a = classes.find((c) => c.name === "order-a")!;
+    expect(z).toEqual({ name: "order-z", count: 2, firstId: first });
+    expect(a.firstId).toBeGreaterThan(z.firstId);
+  });
+
+  it("saves the gesture order", async () => {
+    expect(await getGestureOrder()).toEqual([]);
+    await saveGestureOrder(["b", "a"]);
+    expect(await getGestureOrder()).toEqual(["b", "a"]);
   });
 
   it("renaming onto an existing class merges them", async () => {

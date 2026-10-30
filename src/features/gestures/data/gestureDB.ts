@@ -12,9 +12,12 @@
 import type { GestureModel, ModelGesture, Recording, Sample } from "../../../types/gestures";
 
 const DB_NAME = "gestureDB";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_RECORDINGS = "gesture_data";
 const STORE_MODELS = "gesture_models";
+// Small settings, by key (v2): e.g. the order of the saved gestures list.
+const STORE_META = "meta";
+const GESTURE_ORDER_KEY = "gestureOrder";
 
 // Opens (or creates) the database, returning a Promise<IDBDatabase>.
 // This is called automatically by every exported function — you never need
@@ -58,6 +61,10 @@ function openConnection(): Promise<IDBDatabase> {
           autoIncrement: true,
         });
         modelStore.createIndex("modelName", "modelName", { unique: false });
+      }
+
+      if (!db.objectStoreNames.contains(STORE_META)) {
+        db.createObjectStore(STORE_META); // keys given on put, e.g. "gestureOrder"
       }
     };
 
@@ -159,29 +166,68 @@ export async function getRecordingsForGesture(gestureName: string): Promise<Reco
   return promisify(index.getAll(gestureName));
 }
 
+/** A gesture class: its recording count and its oldest recording's id. */
+export interface GestureClassInfo {
+  name: string;
+  count: number;
+  /** Ids grow with each save, so this orders classes by when they were created. */
+  firstId: number;
+}
+
 /**
- * Get a count of recordings per gesture class, e.g. { nod: 5, shake: 3 }.
+ * List every gesture class with its recording count and first recording id.
+ * (Index order, i.e. alphabetical — see lib/gestureOrder for display order.)
  */
-export async function getGestureCounts(): Promise<Record<string, number>> {
+export async function getGestureClasses(): Promise<GestureClassInfo[]> {
   const db = await openDB();
   const tx = db.transaction(STORE_RECORDINGS, "readonly");
   const index = tx.objectStore(STORE_RECORDINGS).index("gestureName");
-  const counts: Record<string, number> = {};
+  const classes = new Map<string, GestureClassInfo>();
   return new Promise((resolve, reject) => {
     // A key cursor walks the index only — no recording's samples are loaded.
     const request = index.openKeyCursor();
     request.onsuccess = () => {
       const cursor = request.result;
       if (!cursor) {
-        resolve(counts);
+        resolve([...classes.values()]);
         return;
       }
       const name = String(cursor.key);
-      counts[name] = (counts[name] || 0) + 1;
+      const id = Number(cursor.primaryKey);
+      const info = classes.get(name);
+      if (info) {
+        info.count += 1;
+        info.firstId = Math.min(info.firstId, id);
+      } else {
+        classes.set(name, { name, count: 1, firstId: id });
+      }
       cursor.continue();
     };
     request.onerror = () => reject(request.error);
   });
+}
+
+/**
+ * Get a count of recordings per gesture class, e.g. { nod: 5, shake: 3 }.
+ */
+export async function getGestureCounts(): Promise<Record<string, number>> {
+  const classes = await getGestureClasses();
+  return Object.fromEntries(classes.map((c) => [c.name, c.count]));
+}
+
+/** The user's saved order of gesture classes ([] until they reorder). */
+export async function getGestureOrder(): Promise<string[]> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_META, "readonly");
+  const value: unknown = await promisify(tx.objectStore(STORE_META).get(GESTURE_ORDER_KEY));
+  return Array.isArray(value) ? value.filter((n): n is string => typeof n === "string") : [];
+}
+
+export async function saveGestureOrder(names: string[]): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_META, "readwrite");
+  tx.objectStore(STORE_META).put(names, GESTURE_ORDER_KEY);
+  await txDone(tx);
 }
 
 /**
