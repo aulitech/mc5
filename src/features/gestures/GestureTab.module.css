@@ -333,6 +333,98 @@
   gap: 0.5rem;
 }
 
+/* ── Playback timeline (PlaybackTimeline) ─────────────────────────────────── */
+/* Along the bottom of a replaying pane, over the canvas. Padded at the sides
+   so the time readout and the end labels stay inside it. Top to bottom: the
+   playhead's ms readout, ticks rising from a baseline, then the second labels. */
+.timeline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0.2rem;
+  z-index: 1;
+  box-sizing: border-box;
+  height: 44px;
+  padding: 0 1.5rem;
+  color: var(--viz-color);
+  cursor: ew-resize;
+  touch-action: none; /* dragging scrubs instead of scrolling */
+  user-select: none;
+}
+
+.timelineTrack {
+  position: relative;
+  height: 100%;
+}
+
+.timelineTrack::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30px;
+  height: 1px;
+  background: var(--viz-color);
+}
+
+.tick {
+  position: absolute;
+  bottom: 14px; /* stands on the baseline */
+  width: 1px;
+  background: var(--viz-color);
+  transform: translateX(-50%);
+}
+
+.tickMinor { height: 4px; }
+.tickMid   { height: 8px; }
+.tickMajor { height: 12px; width: 2px; }
+
+.tickLabel {
+  position: absolute;
+  top: 30px;
+  font-size: 0.62rem;
+  line-height: 13px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.playhead {
+  position: absolute;
+  top: 15px;
+  left: 0;
+  width: 2px;
+  height: 18px;
+  background: var(--viz-danger);
+  transform: translateX(-50%);
+}
+
+/* The ms readout, centred over the playhead. */
+.playheadTime {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0 0.3rem;
+  border-radius: 3px;
+  border: 1px solid var(--viz-danger);
+  background: var(--viz-bg);
+  font-size: 0.62rem;
+  line-height: 12px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Focused: ring the readout rather than the thin line, in a colour that
+   shows on the dark strip (the app's --focus-ring doesn't, in light mode). */
+.timeline .playhead:focus-visible {
+  outline: none;
+}
+
+.playhead:focus-visible .playheadTime {
+  outline: 2px solid var(--viz-color);
+  outline-offset: 1px;
+}
+
 /* One pane; its size is set inline (smaller when comparing). */
 .visualizerWrap {
   position: relative;
@@ -368,6 +460,35 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Leaves room for the turn button in the pane's corner. */
+.vizCaptionBesideCorner {
+  right: 2.2rem;
+}
+
+/* Turns the model about Y (-22.5°, 0°, 22.5°) in every pane. */
+.vizTurnBtn {
+  position: absolute;
+  top: 0.2rem;
+  right: 0.25rem;
+  z-index: 2;
+  display: flex;
+  padding: 0.2rem;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--viz-color);
+  cursor: pointer;
+}
+
+.vizTurnBtn:hover {
+  background: color-mix(in srgb, var(--viz-color) 15%, transparent);
+}
+
+/* The app's --focus-ring doesn't show on the dark panel in light mode. */
+.vizTurnBtn:focus-visible {
+  outline-color: var(--viz-color);
 }
 
 /* When comparing, panes are clickable; the target one is outlined. */

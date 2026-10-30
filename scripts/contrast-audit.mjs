@@ -81,7 +81,8 @@ const PAIRS = [
   // 3D viewer: darkest model shade and deepest axis colour (fixed in
   // GestureVisualizer.tsx) on the viewer panel
   ["--viz-color", "--viz-bg", TEXT],
-  // Recording timer track drawn over the viewer
+  // Recording timer track drawn over the viewer; the playback timeline's
+  // ticks and labels (--viz-color) and playhead (--viz-danger)
   ["--viz-danger", "--viz-bg", UI],
   ["--viz-success", "--viz-bg", UI],
   ["#808080", "--viz-bg", UI],

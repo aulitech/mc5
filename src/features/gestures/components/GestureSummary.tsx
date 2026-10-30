@@ -250,7 +250,7 @@ function GestureSummary() {
                         }}
                         aria-pressed={isShown("recording", rec.id)}
                       >
-                        {fmtTime(rec.timestamp)}
+                        {fmtTime(rec.timestamp)} <span className={styles.sampleCount}>n={rec.data.length}</span>
                       </button>
                       <button
                         className="btn-ghost btn-danger"
