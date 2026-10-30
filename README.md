@@ -21,7 +21,7 @@ Updates** returns 404 there. To test it locally, run `npx netlify dev` with
 
 The pre-commit hook runs typecheck, lint, tests and the contrast check.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the `dev` → `main` workflow, version
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → `dev` → `main` workflow, version
 bumps and Netlify deploys.
 
 ## Installing as an app (PWA)
