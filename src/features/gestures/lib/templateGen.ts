@@ -261,12 +261,13 @@ export function buildTemplateWithOutlierRejection(
 }
 
 /**
- * Trigger a browser download of a ZIP archive containing one CSV per gesture class.
- * Each CSV has columns: t (0-99), acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z
+ * Build the device's model archive (xcorr_model.zip): model_params.csv plus
+ * one CSV per gesture class, each holding its template as t (0-99) rows of
+ * acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z.
  *
  * @param templates - Output of buildTemplate() per class
  */
-export async function exportTemplatesZip(templates: Record<string, Template>) {
+export async function buildTemplatesZip(templates: Record<string, Template>): Promise<Blob> {
   const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const cols = TEMPLATE_CHANNELS;
@@ -297,11 +298,5 @@ export async function exportTemplatesZip(templates: Record<string, Template>) {
     zip.file(`model_templates_${i}.csv`, values.join(" "));
   });
 
-  const blob = await zip.generateAsync({ type: "blob" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "xcorr_model.zip";
-  a.click();
-  URL.revokeObjectURL(url);
+  return zip.generateAsync({ type: "blob" });
 }

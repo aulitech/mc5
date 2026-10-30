@@ -2,7 +2,7 @@
 //
 // Unlike user-recorded gestures, these ship as pre-built templates in
 // public/standard_gestures/*.csv — one file per gesture, in the exact format
-// exportTemplatesZip() produces: a single line of space-separated numbers,
+// buildTemplatesZip() produces: a single line of space-separated numbers,
 // grouped in sixes per timestep as [acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z].
 // There are no individual recordings behind them, just the template itself.
 
@@ -25,7 +25,7 @@ export const STANDARD_GESTURES: StandardGesture[] = [
 
 // Parse one of the CSV files into the same { acc_x, acc_y, ... } shape
 // buildTemplate() produces, so it can feed GestureTemplateChart / saveModel /
-// exportTemplatesZip without any special-casing.
+// buildTemplatesZip without any special-casing.
 export function parseTemplateCsv(text: string): Template {
   const values = text.trim().split(/\s+/).map(Number);
   const n = Math.floor(values.length / COLS.length);

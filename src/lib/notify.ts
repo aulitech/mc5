@@ -3,10 +3,23 @@
 
 export type ToastKind = "error" | "info" | "success";
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
+export interface ToastOptions {
+  /** A button on the toast; clicking it also dismisses the toast. */
+  action?: ToastAction;
+  /** Stay until dismissed or acted on, instead of timing out. */
+  persist?: boolean;
+}
+
 export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
 }
 
 const AUTO_DISMISS_MS: Record<ToastKind, number> = {
@@ -28,16 +41,16 @@ export function dismiss(id: number) {
   publish(toasts.filter((t) => t.id !== id));
 }
 
-function push(kind: ToastKind, message: string) {
+function push(kind: ToastKind, message: string, { action, persist }: ToastOptions = {}) {
   const id = nextId++;
-  publish([...toasts, { id, kind, message }]);
-  setTimeout(() => dismiss(id), AUTO_DISMISS_MS[kind]);
+  publish([...toasts, { id, kind, message, action }]);
+  if (!persist) setTimeout(() => dismiss(id), AUTO_DISMISS_MS[kind]);
 }
 
 export const notify = {
-  error: (message: string) => push("error", message),
-  info: (message: string) => push("info", message),
-  success: (message: string) => push("success", message),
+  error: (message: string, options?: ToastOptions) => push("error", message, options),
+  info: (message: string, options?: ToastOptions) => push("info", message, options),
+  success: (message: string, options?: ToastOptions) => push("success", message, options),
 };
 
 export function subscribe(fn: () => void) {

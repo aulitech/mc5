@@ -181,6 +181,9 @@
   /* 3D gesture viewer panel — dark in both themes (see GestureVisualizer). */
   --viz-bg: var(--baltic-blue-900);
   --viz-color: var(--grey-olive-200);
+  /* Status colours on the (always dark) viewer: the dark-theme ones */
+  --viz-danger: var(--dark-danger);
+  --viz-success: var(--dark-success);
   /* Template chart X / Y / Z lines (Okabe–Ito hues, shaded per theme). */
   --chart-1: light-dark(#005a8c, #56b4e9);
   --chart-2: light-dark(#8a4a00, #e69f00);

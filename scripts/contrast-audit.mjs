@@ -47,6 +47,11 @@ const PAIRS = [
   ["--color-card", "--bg-hover", TEXT],
   ["--color-card", "--bg-selected", TEXT],
   ["--primary", "--bg-card", UI], // selected-row outline, accents
+  // Edit (green) / delete (red) icons on hovered and selected rows
+  ["--success", "--bg-hover", UI],
+  ["--success", "--bg-selected", UI],
+  ["--danger", "--bg-hover", UI],
+  ["--danger", "--bg-selected", UI],
   // Status colours (icons, active indicators, toasts' accent bar)
   // Danger is also text: delete buttons, the toolbar's "Save"/"DC" indicators.
   ["--danger", "--bg-card", TEXT],
@@ -73,6 +78,9 @@ const PAIRS = [
   // 3D viewer: darkest model shade and deepest axis colour (fixed in
   // GestureVisualizer.tsx) on the viewer panel
   ["--viz-color", "--viz-bg", TEXT],
+  // Recording timer track drawn over the viewer
+  ["--viz-danger", "--viz-bg", UI],
+  ["--viz-success", "--viz-bg", UI],
   ["#808080", "--viz-bg", UI],
   ["#f57f17", "--viz-bg", UI],
 ];

@@ -1,12 +1,23 @@
 import { createContext, useContext } from "react";
 import type { GestureModel, Recording, Sample } from "../../../types/gestures";
+import type { RecordingData } from "../lib/recordingFile";
 
-/** What the 3D visualizer is currently showing. */
-export type VisualizerSelection =
-  | { kind: "recording"; id: number; gestureName: string; samples: Sample[] }
-  | { kind: "standard"; id: string; samples: Sample[] };
+/** What one pane of the 3D visualizer shows. */
+export type ViewSource =
+  | { kind: "recording"; id: number; gestureName: string; timestamp: string; samples: Sample[] }
+  | { kind: "standard"; id: string; samples: Sample[] }
+  | { kind: "live" };
+
+/** Visualizer panes: the first always shows; the second only when comparing. */
+export const VIEW_COUNT = 2;
 
 export interface GestureStore {
+  // ── Recording ──
+  /** The gesture new takes are recorded as (an existing class or a new name), or null. */
+  activeGesture: string | null;
+  /** Choose the gesture to record, and set the viewer up for it: one pane, live, normal speed. */
+  selectGesture: (gestureName: string) => void;
+
   // ── Recordings ──
   /** Recording count per gesture class. */
   counts: Record<string, number>;
@@ -19,11 +30,25 @@ export interface GestureStore {
   deleteClass: (gestureName: string) => Promise<void>;
   /** Relabel a class; renaming onto an existing class merges them. */
   renameClass: (oldName: string, newName: string) => Promise<void>;
+  /** Add imported recordings, skipping any already stored (same class and timestamp). */
+  importRecordings: (recordings: RecordingData[]) => Promise<void>;
 
   // ── Visualizer ──
-  selection: VisualizerSelection | null;
+  /** What each pane shows (VIEW_COUNT entries; null = empty). */
+  views: (ViewSource | null)[];
+  /** Two panes side by side, played in sync, instead of one. */
+  compare: boolean;
+  setCompare: (on: boolean) => void;
+  /** The pane that selectRecording/selectStandard/toggleLive fill. */
+  targetView: number;
+  setTargetView: (index: number) => void;
   selectRecording: (recording: Recording) => void;
   selectStandard: (id: string) => Promise<void>;
+  /** Show the live sensor stream in the target pane, or clear it if it already does. */
+  toggleLive: () => void;
+  /** Replays at half speed. */
+  slowMotion: boolean;
+  setSlowMotion: (on: boolean) => void;
 
   // ── Model generation ──
   /** Recorded classes checked for the next model. */

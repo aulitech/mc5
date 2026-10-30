@@ -1,3 +1,4 @@
 #!/usr/bin/env sh
-# Bump the version at release time instead: npm run bump-version
+# Version bumps are manual: npm run bump-version (patch, every dev commit) or
+# npm run bump-minor (release) — see CONTRIBUTING.md.
 npm run typecheck && npm run lint && npm test && npm run contrast

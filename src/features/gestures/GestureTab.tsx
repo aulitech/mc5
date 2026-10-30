@@ -1,36 +1,39 @@
 // GestureTab.tsx — Gesture collection, visualization and template models.
 //
-// Layout only — state lives in GestureStoreProvider (recordings, selection,
-// models), and the sensor stream is on for as long as the tab is open.
+// Layout only — state lives in GestureStoreProvider (recordings, viewer,
+// models). The sensor stream runs while a gesture is chosen for recording or
+// a pane is live.
 //
 // Data flow:
-//   device sensor events → useSensorRecorder (in GestureControl) → store.addRecording
-//   store.selection → GestureVisualizer
-//   checked classes/standard gestures → store.generateModel → ModelList
+//   saved gestures list → store.selectGesture → viewer goes live, Record shown
+//   Record → useGestureTake (device sensor events) → Accept → store.addRecording
+//   store.views (one pane, or two when comparing) → GestureVisualizer, which
+//   replays recordings or follows the device sensor events live
+//   checked classes/standard gestures → Generate model (ModelList) → store.generateModel
 
-import { useState } from "react";
-import { useDialog } from "../../context/DialogContext";
-import GestureControl from "./components/GestureControl";
-import GestureInputs from "./components/GestureInputs";
 import GestureSummary from "./components/GestureSummary";
 import GestureVisualizer from "./components/GestureVisualizer";
 import ModelList from "./components/ModelList";
+import RecordOverlay from "./components/RecordOverlay";
+import { useGestureTake } from "./hooks/useGestureTake";
 import { useSensorStream } from "./hooks/useSensorStream";
 import { GestureStoreProvider } from "./state/GestureStoreProvider";
 import { useGestureStore } from "./state/GestureStoreContext";
 import styles from "./GestureTab.module.css";
 
+// Length of one recording window.
+const RECORD_MS = 2500;
+
 const GestureTabContent = () => {
-  const isStreaming = useSensorStream();
-  const [gestureName, setGestureName] = useState("");
-  const { selection, checkedClasses, checkedStandards, isGenerating, generateModel } = useGestureStore();
-  const { prompt } = useDialog();
+  const { views, compare, activeGesture, selectGesture, addRecording } = useGestureStore();
+  const showsLive = (compare ? views : views.slice(0, 1)).some((v) => v?.kind === "live");
+  const isStreaming = useSensorStream(activeGesture !== null || showsLive);
+  const take = useGestureTake(RECORD_MS, addRecording);
 
-  const nothingChecked = checkedClasses.size === 0 && checkedStandards.size === 0;
-
-  const handleGenerateModel = async () => {
-    const modelName = (await prompt("Name this gesture model:"))?.trim();
-    if (modelName) await generateModel(modelName);
+  const handleRecord = () => {
+    if (!activeGesture) return;
+    selectGesture(activeGesture); // back to a single live pane at normal speed
+    take.start(activeGesture);
   };
 
   return (
@@ -39,29 +42,28 @@ const GestureTabContent = () => {
         <div className={styles.pageSection}>
           <h3 className={styles.pageSectionTitle}>Gesture Recordings</h3>
           <div className={styles.pageSectionBody}>
-            {/* Column 1: inputs, record controls, saved gestures */}
-            <div className={`${styles.leftPanel} ${styles.recordingsPanel}`}>
-              <GestureInputs gestureName={gestureName} onChange={setGestureName} />
-              <GestureControl gestureName={gestureName} isStreaming={isStreaming} />
+            {/* Column 1: saved gestures (choose one to record) */}
+            <div className={styles.leftPanel}>
               <GestureSummary />
-              <button
-                className={styles.btn}
-                onClick={handleGenerateModel}
-                disabled={nothingChecked || isGenerating}
-              >
-                {isGenerating ? "Generating…" : "Generate Gesture Model"}
-              </button>
             </div>
 
-            {/* Column 2: visualizer only */}
+            {/* Column 2: viewer, with the record controls over it */}
             <div className={styles.visualizerColumn}>
-              <GestureVisualizer imuData={selection?.samples} />
+              <GestureVisualizer
+                isStreaming={isStreaming}
+                isRecording={take.phase !== "idle"}
+                overlay={
+                  activeGesture !== null && (
+                    <RecordOverlay gestureName={activeGesture} take={take} onRecord={handleRecord} />
+                  )
+                }
+              />
             </div>
           </div>
         </div>
 
         <div className={styles.pageSection}>
-          <h3 className={styles.pageSectionTitle}>Your Gesture Models</h3>
+          <h3 className={styles.pageSectionTitle}>Gesture Models</h3>
           <div className={styles.pageSectionBody}>
             <ModelList />
           </div>

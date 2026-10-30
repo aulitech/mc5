@@ -32,9 +32,10 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
     │                       # backup validation), leafValue, configFile (backup/restore), releases
     ├── types/              # device.ts, config.ts, gestures.ts
     ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
-    │                       # lib/templateGen.ts, hooks/ (sensor stream/recorder), state/ (store)
+    │                       # lib/templateGen.ts, lib/recordingFile.ts (recordings export/import), hooks/ (sensor stream, recorder, recording take), state/ (store)
     ├── components/
-    │   ├── ui/             # Shell (tab registry), Toaster, HoverClickButton, base UI chrome
+    │   ├── ui/             # Shell (tab registry), Toaster, PwaUpdater (service worker +
+    │   │                   # update prompt), HoverClickButton, base UI chrome
     │   ├── tabs/           # Top-level tab views
     │   ├── tree/           # Recursive JSON node tree rendering (custom editors registered in JsonNodeRenderer)
     │   ├── tools/          # Toolbar/action components
@@ -49,12 +50,14 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
 ### Branches
 - **`dev`** — default branch; all work and Dependabot PRs land here.
 - **`main`** — production: Netlify deploys it to mc.AULI.TECH. Changes reach it only through a `dev` → `main` PR at release time.
+- Versions: patch bump on every commit to `dev`, minor bump when releasing to `main`. Details in CONTRIBUTING.md.
 
 ### Key Concepts
 - **Device layer** — `device/ota.ts` owns the HID connection. `send()` calls are queued (never "Send in progress"); status/sensor/practice reports are events (`useOtaEvent`). It holds no config.
 - **DeviceContext / ConfigContext** — device + status vs. config data. `setConfigValue` edits locally; `updateConfig` edits and sends, rolling back if the device rejects it.
 - **Indices in the config** — action bindings point into `action_list` and `profile_map` into `profiles`. Delete actions with `deleteAction` and profiles with `deleteConfigItem`, which re-point them; don't splice those arrays directly.
 - **Recursive tree rendering** — components in `tree/` render JSON nodes recursively from `UI_SCHEMA(gestureNames)`.
+- **PWA** — vite-plugin-pwa (config in vite.config.ts) precaches the whole build, so files in `public/` and the build output are available offline; `/api/*` is never cached. The service worker exists only in production builds (`npm run build && npm run preview`), not in `npm run dev`.
 - **Errors and confirmations** — use `notify` (lib/notify.ts) and `useDialog()`, not `alert`/`confirm`/`prompt`.
 - **Colours** — use the theme tokens in `styles/index.css` (each has a light and a dark value), never hex literals in components. `npm run contrast` checks every token pairing against WCAG (4.5:1 text, 3:1 UI); add a pair to `scripts/contrast-audit.mjs` for any new combination.
 - **Checks** — `npm run typecheck`, `npm run lint`, `npm test`, `npm run contrast` (all in the pre-commit hook); `npm run build` runs the typecheck first. Component tests use jsdom (`// @vitest-environment jsdom`); IndexedDB tests use `fake-indexeddb`.
