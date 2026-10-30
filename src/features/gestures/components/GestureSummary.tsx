@@ -2,14 +2,17 @@
 //
 // Clicking a class chooses it as the gesture to record (the viewer goes live,
 // with Record over it); its disclosure arrow shows or hides its recordings.
-// "New gesture" names a new one. From the list the user can also:
+// "New gesture" names a new one. Classes are listed in the user's order —
+// dragged by their handles (or moved with ↑/↓ on a focused handle) — else in
+// the order they were created; never alphabetically. From the list the user
+// can also:
 //   • Click a recording to load it in the 3D visualizer (its target pane)
 //   • Delete a single recording
 //   • Rename or delete the entire class (all recordings)
 //   • Check classes / standard gestures for model generation
 
-import { Pencil, Trash2 } from "lucide-react";
-import { useState, type MouseEvent } from "react";
+import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { useState, type DragEvent, type KeyboardEvent, type MouseEvent } from "react";
 import { useDialog } from "../../../context/DialogContext";
 import { errorMessage, notify } from "../../../lib/notify";
 import type { Recording } from "../../../types/gestures";
@@ -20,13 +23,17 @@ import { useGestureStore } from "../state/GestureStoreContext";
 import DisclosureTriangle from "./DisclosureTriangle";
 import styles from "../GestureTab.module.css";
 
-
 function GestureSummary() {
   const store = useGestureStore();
   const { confirm, prompt } = useDialog();
   // Every class currently showing its recordings list — any number can be
   // open at once.
   const [expandedClasses, setExpandedClasses] = useState<Set<string>>(() => new Set());
+  // Drag to reorder: a handle starts the drag; each class row is a drop
+  // target, and the drop lands before or after it by which half the pointer
+  // is over.
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [dropAt, setDropAt] = useState<{ name: string; after: boolean } | null>(null);
 
   const replaceExpanded = (from: string, to?: string) =>
     setExpandedClasses((prev) => {
@@ -45,6 +52,47 @@ function GestureSummary() {
       setExpandedClasses((prev) => new Set(prev).add(name));
       store.loadRecordings(name);
     }
+  };
+
+  const handleDragStart = (e: DragEvent<HTMLElement>, name: string) => {
+    setDragging(name);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", name);
+    const row = e.currentTarget.closest("li");
+    if (row) e.dataTransfer.setDragImage(row, 12, 12); // drag the whole row, not just the handle
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLLIElement>, name: string) => {
+    if (!dragging) return;
+    e.preventDefault(); // allow a drop here
+    e.dataTransfer.dropEffect = "move";
+    const { top, height } = e.currentTarget.getBoundingClientRect();
+    const after = e.clientY > top + height / 2;
+    if (dropAt?.name !== name || dropAt.after !== after) setDropAt({ name, after });
+  };
+
+  const endDrag = () => {
+    setDragging(null);
+    setDropAt(null);
+  };
+
+  const handleDrop = (e: DragEvent) => {
+    e.preventDefault();
+    if (dragging && dropAt && dropAt.name !== dragging) {
+      const order = store.gestureOrder;
+      let to = order.indexOf(dropAt.name) + (dropAt.after ? 1 : 0);
+      if (order.indexOf(dragging) < to) to -= 1; // it leaves its old place first
+      store.moveGesture(dragging, to);
+    }
+    endDrag();
+  };
+
+  // ↑/↓ on a focused handle moves its class one place.
+  const handleHandleKey = (e: KeyboardEvent, name: string) => {
+    const delta = e.key === "ArrowUp" ? -1 : e.key === "ArrowDown" ? 1 : 0;
+    if (delta === 0) return;
+    e.preventDefault();
+    store.moveGesture(name, store.gestureOrder.indexOf(name) + delta);
   };
 
   const handleNewGesture = async () => {
@@ -88,8 +136,9 @@ function GestureSummary() {
   // Highlight whatever is showing in any pane.
   const isShown = (kind: "recording" | "standard", id: number | string) =>
     store.views.some((v) => v?.kind === kind && v.id === id);
-  const entries = Object.entries(store.counts);
-  // A newly named gesture has no recordings (and no class) until its first take is saved.
+  const entries = store.gestureOrder.filter((name) => name in store.counts).map((name) => [name, store.counts[name]] as const);
+  // A newly named gesture has no recordings (and no class) until its first
+  // take is saved; it's shown at the end, where it will be added.
   const pending = store.activeGesture !== null && !(store.activeGesture in store.counts) ? store.activeGesture : null;
 
   return (
@@ -103,26 +152,35 @@ function GestureSummary() {
       )}
 
       <ul className={styles.summaryList}>
-        {pending && (
-          <li className={styles.classGroup}>
-            <div className={`${styles.summaryItem} ${styles.selected}`}>
-              <span className={styles.disclosure} aria-hidden="true" /> {/* no recordings to show yet */}
-              <span className={styles.gestureCount}>0</span>
-              <span className={styles.gestureName}>{pending}</span>
-            </div>
-          </li>
-        )}
         {entries.map(([name, count]) => {
           const recordings = store.recordings[name];
           const expanded = expandedClasses.has(name);
+          const dropClass = dropAt?.name === name && dragging !== name ? (dropAt.after ? styles.dropAfter : styles.dropBefore) : "";
           return (
-            <li key={name} className={styles.classGroup}>
+            <li
+              key={name}
+              className={`${styles.classGroup} ${dropClass} ${dragging === name ? styles.dragging : ""}`}
+              onDragOver={(e) => handleDragOver(e, name)}
+              onDrop={handleDrop}
+            >
               {/* ── Class header row ── */}
               <div
                 className={`${styles.summaryItem} ${name === store.activeGesture ? styles.selected : ""}`}
                 onClick={() => store.selectGesture(name)}
                 title="Click to record this gesture"
               >
+                <button
+                  className={`btn-plain ${styles.dragHandle}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, name)}
+                  onDragEnd={endDrag}
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => handleHandleKey(e, name)}
+                  aria-label={`Move "${name}" (drag, or use the up and down arrow keys)`}
+                  title="Drag to reorder"
+                >
+                  <GripVertical size={16} />
+                </button>
                 <button
                   className={`btn-plain ${styles.disclosure} ${expanded ? styles.disclosureOpen : ""}`}
                   onClick={(e) => handleToggleExpanded(e, name)}
@@ -204,7 +262,18 @@ function GestureSummary() {
                       </button>
                     </li>
                   ))}
-                </ul>
+                  {pending && (
+          <li className={styles.classGroup}>
+            <div className={`${styles.summaryItem} ${styles.selected}`}>
+              {/* Nothing to drag or show until its first take is saved */}
+              <span className={styles.dragHandle} aria-hidden="true" />
+              <span className={styles.disclosure} aria-hidden="true" />
+              <span className={styles.gestureCount}>0</span>
+              <span className={styles.gestureName}>{pending}</span>
+            </div>
+          </li>
+        )}
+      </ul>
               )}
             </li>
           );

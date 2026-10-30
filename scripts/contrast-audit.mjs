@@ -47,6 +47,9 @@ const PAIRS = [
   ["--color-card", "--bg-hover", TEXT],
   ["--color-card", "--bg-selected", TEXT],
   ["--primary", "--bg-card", UI], // selected-row outline, accents
+  // Drag handles (muted) on hovered and selected rows
+  ["--color-muted", "--bg-hover", UI],
+  ["--color-muted", "--bg-selected", UI],
   // Edit (green) / delete (red) icons on hovered and selected rows
   ["--success", "--bg-hover", UI],
   ["--success", "--bg-selected", UI],

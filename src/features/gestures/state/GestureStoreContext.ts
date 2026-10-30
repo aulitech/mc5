@@ -21,6 +21,10 @@ export interface GestureStore {
   // ── Recordings ──
   /** Recording count per gesture class. */
   counts: Record<string, number>;
+  /** Gesture classes in list order (the user's, else creation order — never alphabetical). */
+  gestureOrder: string[];
+  /** Move a class to `toIndex` in the list, and remember the order. */
+  moveGesture: (gestureName: string, toIndex: number) => void;
   /** Recordings per class, newest first — only for classes that have been loaded. */
   recordings: Record<string, Recording[]>;
   loadRecordings: (gestureName: string) => Promise<void>;
@@ -46,6 +50,9 @@ export interface GestureStore {
   selectStandard: (id: string) => Promise<void>;
   /** Show the live sensor stream in the target pane, or clear it if it already does. */
   toggleLive: () => void;
+  /** Bumped to put every pane back at its rest pose (Record, "Reset position"). */
+  positionResets: number;
+  resetPosition: () => void;
   /** Replays at half speed. */
   slowMotion: boolean;
   setSlowMotion: (on: boolean) => void;

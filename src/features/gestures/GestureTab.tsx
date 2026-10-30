@@ -25,7 +25,7 @@ import styles from "./GestureTab.module.css";
 const RECORD_MS = 2500;
 
 const GestureTabContent = () => {
-  const { views, compare, activeGesture, selectGesture, addRecording } = useGestureStore();
+  const { views, compare, activeGesture, selectGesture, addRecording, resetPosition } = useGestureStore();
   const showsLive = (compare ? views : views.slice(0, 1)).some((v) => v?.kind === "live");
   const isStreaming = useSensorStream(activeGesture !== null || showsLive);
   const take = useGestureTake(RECORD_MS, addRecording);
@@ -33,6 +33,7 @@ const GestureTabContent = () => {
   const handleRecord = () => {
     if (!activeGesture) return;
     selectGesture(activeGesture); // back to a single live pane at normal speed
+    resetPosition(); // the take starts from the rest pose
     take.start(activeGesture);
   };
 
