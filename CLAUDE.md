@@ -48,9 +48,9 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
 ```
 
 ### Branches
-- **`dev`** — default branch; all work and Dependabot PRs land here.
+- **`dev`** — default branch. Every change is a branch off `dev` (`feature/…`, `fix/…`, `docs/…`) merged back through a PR, which gets a Netlify deploy preview; never commit to `dev` directly. Dependabot PRs land here too.
 - **`main`** — production: Netlify deploys it to mc.AULI.TECH. Changes reach it only through a `dev` → `main` PR at release time.
-- Versions: patch bump on every commit to `dev`, minor bump when releasing to `main`. Details in CONTRIBUTING.md.
+- Versions: one patch bump per branch merged into `dev`, minor bump (on a `release/X.Y.0` branch) when releasing to `main`. Details in CONTRIBUTING.md.
 
 ### Key Concepts
 - **Device layer** — `device/ota.ts` owns the HID connection. `send()` calls are queued (never "Send in progress"); status/sensor/practice reports are events (`useOtaEvent`). It holds no config.
