@@ -129,6 +129,27 @@ export async function saveRecording(gestureName: string, data: Sample[]): Promis
 }
 
 /**
+ * Add recordings that keep their own class and timestamp (an import), in one
+ * transaction — all are added or none.
+ */
+export async function addRecordings(recordings: Omit<Recording, "id">[]): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_RECORDINGS, "readwrite");
+  const store = tx.objectStore(STORE_RECORDINGS);
+  for (const { gestureName, timestamp, data } of recordings) store.add({ gestureName, timestamp, data });
+  await txDone(tx);
+}
+
+/**
+ * Fetch every stored recording, in the order they were saved.
+ */
+export async function getAllRecordings(): Promise<Recording[]> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_RECORDINGS, "readonly");
+  return promisify(tx.objectStore(STORE_RECORDINGS).getAll());
+}
+
+/**
  * Fetch all recordings for a specific gesture class.
  */
 export async function getRecordingsForGesture(gestureName: string): Promise<Recording[]> {

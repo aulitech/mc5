@@ -2,10 +2,12 @@ import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
 import type { Sample } from "../../../types/gestures";
 import {
+  addRecordings,
   deleteGesture,
   deleteModel,
   deleteRecording,
   getAllModels,
+  getAllRecordings,
   getGestureCounts,
   getRecordingsForGesture,
   renameGesture,
@@ -24,6 +26,19 @@ describe("gestureDB", () => {
     const counts = await getGestureCounts();
     expect(counts["count-a"]).toBe(2);
     expect(counts["count-b"]).toBe(1);
+  });
+
+  it("adds recordings with their own timestamps", async () => {
+    const timestamp = "2026-01-02T03:04:05.000Z";
+    await addRecordings([
+      { gestureName: "import-a", timestamp, data: samples },
+      { gestureName: "import-b", timestamp, data: samples },
+    ]);
+    const added = (await getAllRecordings()).filter((r) => r.gestureName.startsWith("import-"));
+    expect(added.map((r) => [r.gestureName, r.timestamp])).toEqual([
+      ["import-a", timestamp],
+      ["import-b", timestamp],
+    ]);
   });
 
   it("renaming onto an existing class merges them", async () => {

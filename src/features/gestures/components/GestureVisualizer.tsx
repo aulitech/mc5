@@ -1,28 +1,34 @@
-// GestureVisualizer.tsx — 3D animation of a gesture recording using Three.js.
+// GestureVisualizer.tsx — 3D animation of gesture recordings using Three.js.
 //
-// This component creates a miniature 3D world inside a <canvas> element.
-// It loads the Cato device's 3D model (an STL file) and animates it frame-by-frame
-// using the recorded IMU data — gyroscope drives rotation, accelerometer drives
-// position. The animation loops continuously so you can watch the gesture replay.
+// Each pane is a miniature 3D world inside a <canvas>: the Cato device's 3D
+// model (an STL file), animated from IMU data — gyroscope drives rotation,
+// accelerometer drives position. A pane replays a recording or standard
+// gesture in a loop, or shows "Live": the device's sensor stream in real time
+// (rotation only — see the animation loop).
 //
-// When no recording is playing and none is being recorded, "Live" instead
-// drives the model from the device's sensor stream in real time (rotation
-// only — see the animation loop). "Reset position" returns the model to its
-// rest pose, undoing gyro drift in live mode or restarting the replay.
+// "Compare" shows two panes side by side, kept in sync: one clock drives both
+// replays (they start together and loop when the longer one ends), and they
+// share one camera, so orbiting either view turns both. Clicking a pane makes
+// it the one the next selected recording, standard gesture or Live fills.
+// "Reset position" puts every pane back at its rest pose and restarts the
+// replays together, which also undoes live gyro drift. The record controls
+// (RecordOverlay) are drawn over the first pane.
 //
-// The scene is built once per mount; selecting another recording only swaps
-// the samples being replayed. Playback controls (pause/play, speed) and the
-// samples reach the animation loop via refs — React state can't be read inside
-// a requestAnimationFrame closure because the closure captures a snapshot of
-// state at creation time, while a ref always holds the current value.
+// One animation loop drives every pane and reads its inputs through refs —
+// React state can't be read inside a requestAnimationFrame closure because
+// the closure captures a snapshot of state at creation time, while a ref
+// always holds the current value.
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useConfig } from "../../../context/ConfigContext";
 import { useOtaEvent } from "../../../device/useOtaEvent";
 import type { Sample, Triple } from "../../../types/gestures";
+import { STANDARD_GESTURES } from "../data/standardGestures";
+import { fmtTime } from "../lib/format";
+import { useGestureStore, type ViewSource } from "../state/GestureStoreContext";
 import styles from "../GestureTab.module.css";
 
 // Three shades of yellow, one per axis — distinct enough to help judge depth
@@ -114,7 +120,7 @@ function createAxesIndicator(length = 25, radius = 0.4) {
   return group;
 }
 
-// IMU samples per second. Playback consumes samples at this rate (× speed),
+// IMU samples per second. Replays consume samples at this rate (× speed),
 // and the gyro integration below treats each sample as 1/SAMPLE_RATE_HZ s.
 const SAMPLE_RATE_HZ = 100;
 // Cap on how much time one animation frame may catch up (e.g. after the tab
@@ -123,7 +129,11 @@ const MAX_FRAME_MS = 100;
 // Live samples waiting for the next animation frame are capped (e.g. while
 // the tab is hidden and frames stop); beyond this the oldest are dropped.
 const MAX_LIVE_BACKLOG = SAMPLE_RATE_HZ * 10;
-const CANVAS_SIZE = 400;
+// Pane edge length: a single pane, or each of the two when comparing.
+const PANE_SIZE = 400;
+const COMPARE_PANE_SIZE = 320;
+// Where the camera starts, and returns to on "Reset camera view".
+const CAMERA_HOME = new THREE.Vector3(0, 0, 50);
 
 // The STL is fetched and parsed once per page and shared by every mount.
 let catoGeometry: Promise<THREE.BufferGeometry> | null = null;
@@ -135,19 +145,17 @@ function loadCatoGeometry() {
   return catoGeometry;
 }
 
-/** What the animation loop is replaying; replaced whenever the input changes. */
+/** A recording or standard gesture prepared for replay. */
 interface Playback {
   samples: Sample[];
   /** Gravity baseline subtracted from acceleration. */
-  meanAcc: [number, number, number];
-  frame: number;
-  /** Fractional samples owed to playback (see the animation loop). */
-  accum: number;
+  meanAcc: Triple;
 }
 
-function createPlayback(samples: Sample[] | null | undefined): Playback | null {
-  if (!samples || samples.length === 0) return null;
-  const meanAcc: [number, number, number] = [0, 0, 0];
+function createPlayback(source: ViewSource | null): Playback | null {
+  if (!source || source.kind === "live" || source.samples.length === 0) return null;
+  const { samples } = source;
+  const meanAcc: Triple = [0, 0, 0];
   for (const sample of samples) {
     meanAcc[0] += sample.acc[0];
     meanAcc[1] += sample.acc[1];
@@ -156,7 +164,18 @@ function createPlayback(samples: Sample[] | null | undefined): Playback | null {
   meanAcc[0] /= samples.length;
   meanAcc[1] /= samples.length;
   meanAcc[2] /= samples.length;
-  return { samples, meanAcc, frame: 0, accum: 0 };
+  return { samples, meanAcc };
+}
+
+function sourceLabel(source: ViewSource) {
+  switch (source.kind) {
+    case "recording":
+      return `${source.gestureName} · ${fmtTime(source.timestamp)}`;
+    case "standard":
+      return STANDARD_GESTURES.find((g) => g.id === source.id)?.label ?? source.id;
+    case "live":
+      return "Live";
+  }
 }
 
 // Disposes every geometry/material under `root`, except ones in `keep`.
@@ -169,114 +188,297 @@ function disposeTree(root: THREE.Object3D, keep: Set<unknown>) {
   });
 }
 
-interface GestureVisualizerProps {
-  imuData: Sample[] | null | undefined;
-  /** The device's sensor stream is running (needed for the live view). */
-  isStreaming: boolean;
-  /** A recording is in progress; the live view is unavailable meanwhile. */
-  isRecording: boolean;
+// Reused for every sample to avoid allocating a Vector3/Quaternion per sample.
+const deltaRotVec = new THREE.Vector3();
+const deltaQuat = new THREE.Quaternion();
+
+// Integrate body-frame angular velocity as a quaternion rotation rather than
+// summing independent Euler angles — Euler axes aren't orthogonal once more
+// than one axis is active (each later axis in the rotation order inherits a
+// tilt from whatever the earlier axes have already accumulated), which warps
+// the apparent rotation axis over time. Composing a small quaternion per
+// sample and right-multiplying it onto the current orientation (i.e. applying
+// it in the device's own local frame, matching how gyro data is measured)
+// avoids that entirely.
+function applyGyro(device: THREE.Object3D, gyro: Triple) {
+  deltaRotVec.set(
+    THREE.MathUtils.degToRad(-gyro[0] / SAMPLE_RATE_HZ),
+    THREE.MathUtils.degToRad(gyro[1] / SAMPLE_RATE_HZ),
+    THREE.MathUtils.degToRad(-gyro[2] / SAMPLE_RATE_HZ),
+  );
+  const angle = deltaRotVec.length();
+  if (angle > 0) {
+    deltaQuat.setFromAxisAngle(deltaRotVec.normalize(), angle);
+    device.quaternion.multiply(deltaQuat);
+  }
 }
 
-const GestureVisualizer = ({ imuData, isStreaming, isRecording }: GestureVisualizerProps) => {
+/** One pane's scene, as the animation loop sees it. */
+interface PaneScene {
+  /** Carries the rest pose plus replayed or live motion. */
+  device: THREE.Group;
+  /** Samples of the pane's replay applied so far. */
+  frame: number;
+  /** False until the STL has loaded. */
+  isReady: () => boolean;
+  render: () => void;
+  setSize: (size: number) => void;
+  setShowAxes: (show: boolean) => void;
+  dispose: () => void;
+}
+
+// Builds a pane's renderer and scene in `mount`. The camera and its orbit
+// target are shared by every pane, so they're always seen from one angle.
+function createPaneScene(mount: HTMLElement, camera: THREE.PerspectiveCamera, target: THREE.Vector3): PaneScene {
+  const scene = new THREE.Scene();
+
+  // alpha + a transparent clear colour let the viz blend into the page.
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setClearColor(0x000000, 0);
+  mount.appendChild(renderer.domElement);
+
+  // Lets the user click-and-drag to orbit the camera around the device.
+  // Orbiting only ever moves the camera, never the model, so the configured
+  // rest pose stays where it's set. Every pane's controls drive the same
+  // camera and target vector.
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target = target;
+  controls.update();
+
+  // ── Lighting ─────────────────────────────────────────────────────────────
+  const light = new THREE.DirectionalLight(0xffffff, 1);
+  light.position.set(5, 5, 5);
+  scene.add(light);
+  scene.add(new THREE.AmbientLight(0xffffff, 0.4));
+
+  // ── Materials ─────────────────────────────────────────────────────────────
+  const shaderMaterial = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      void main() {
+        float t = 0.5 * (1.0 + dot(vNormal, normalize(vec3(1.0, 1.0, 0.5))));
+        vec3 dark  = vec3(0.50, 0.50, 0.50);
+        vec3 light = vec3(0.85, 0.85, 0.85);
+        gl_FragColor = vec4(mix(light, dark, t), 1.0);
+      }
+    `,
+  });
+
+  // ── Model ─────────────────────────────────────────────────────────────────
+  // deviceGroup carries the rest pose + motion; meshGroup the static STL→IMU
+  // axis correction.
+  const deviceGroup = new THREE.Group();
+  scene.add(deviceGroup);
+  const meshGroup = new THREE.Group();
+  meshGroup.rotation.copy(MESH_CORRECTION_EULER);
+  deviceGroup.add(meshGroup);
+
+  let disposed = false;
+  let showAxes = false;
+  let axesHelper: THREE.Group | null = null;
+  let sharedGeometry: THREE.BufferGeometry | null = null;
+  loadCatoGeometry().then(
+    (geometry) => {
+      if (disposed) return;
+      sharedGeometry = geometry;
+      const mesh = new THREE.Mesh(geometry, shaderMaterial);
+      mesh.scale.set(0.5, 0.5, 0.5);
+      meshGroup.add(mesh);
+
+      // No offset relative to meshGroup, so these are the STL file's own
+      // raw axes (no IMU-alignment correction applied).
+      axesHelper = createAxesIndicator(25, 0.4);
+      axesHelper.visible = showAxes;
+      mesh.add(axesHelper);
+    },
+    (err) => console.error("GestureVisualizer: failed to load cato model.stl", err),
+  );
+
+  return {
+    device: deviceGroup,
+    frame: 0,
+    isReady: () => meshGroup.children.length > 0,
+    render: () => {
+      controls.update();
+      renderer.render(scene, camera);
+    },
+    setSize: (size) => renderer.setSize(size, size),
+    setShowAxes: (show) => {
+      showAxes = show;
+      if (axesHelper) axesHelper.visible = show;
+    },
+    dispose: () => {
+      disposed = true;
+      controls.dispose();
+      disposeTree(scene, new Set([sharedGeometry])); // the STL geometry is shared
+      shaderMaterial.dispose();
+      renderer.dispose();
+      renderer.forceContextLoss(); // release the WebGL context now, not at GC
+      if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
+    },
+  };
+}
+
+interface ViewerPaneProps {
+  index: number;
+  source: ViewSource | null;
+  size: number;
+  showAxes: boolean;
+  camera: THREE.PerspectiveCamera;
+  target: THREE.Vector3;
+  register: (index: number, pane: PaneScene | null) => void;
+  /** "Left"/"Right" when comparing; null for a single pane. */
+  side: string | null;
+  isTarget: boolean;
+  onTarget: () => void;
+  /** Drawn over the pane (the record controls). */
+  overlay?: ReactNode;
+}
+
+const ViewerPane = ({
+  index, source, size, showAxes, camera, target, register, side, isTarget, onTarget, overlay,
+}: ViewerPaneProps) => {
   const mountRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<PaneScene | null>(null);
+
+  // The scene is built once per mount and handed to the shared animation loop.
+  useEffect(() => {
+    const pane = createPaneScene(mountRef.current!, camera, target);
+    paneRef.current = pane;
+    register(index, pane);
+    return () => {
+      register(index, null);
+      paneRef.current = null;
+      pane.dispose();
+    };
+  }, [camera, target, index, register]);
+
+  useEffect(() => {
+    paneRef.current?.setSize(size);
+  }, [size]);
+
+  useEffect(() => {
+    paneRef.current?.setShowAxes(showAxes);
+  }, [showAxes]);
+
+  const label = source ? sourceLabel(source) : "empty";
+  const emptyMsg = !side
+    ? "Select a gesture to visualize, or choose Live to follow Cato in real time."
+    : isTarget
+      ? "Select a recording or standard gesture, or choose Live, to show it here."
+      : "Click here, then select something to compare.";
+
+  return (
+    <div
+      className={`${styles.visualizerWrap} ${side ? styles.vizPaneCompare : ""} ${isTarget ? styles.vizPaneTarget : ""}`}
+      style={{ width: size, height: size }}
+      onPointerDown={side ? onTarget : undefined}
+    >
+      {side ? (
+        <button
+          className={`btn-plain ${styles.vizCaption}`}
+          onClick={onTarget}
+          aria-pressed={isTarget}
+          title="Selected recordings, standard gestures and Live load into the highlighted side"
+        >
+          {side}: {label}
+        </button>
+      ) : (
+        source && <span className={styles.vizCaption}>{label}</span>
+      )}
+      {!source && !overlay && <p className={styles.emptyMsg}>{emptyMsg}</p>}
+      <div ref={mountRef} style={source ? undefined : { display: "none" }} />
+      {overlay}
+    </div>
+  );
+};
+
+interface GestureVisualizerProps {
+  /** The device's sensor stream is running (needed for the live view). */
+  isStreaming: boolean;
+  /** A take is in progress: the panes stay as they are until it's done. */
+  isRecording: boolean;
+  /** Drawn over the first pane (the record controls). */
+  overlay?: ReactNode;
+}
+
+const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisualizerProps) => {
+  const { views, compare, setCompare, targetView, setTargetView, toggleLive, slowMotion, setSlowMotion } =
+    useGestureStore();
   const { data } = useConfig();
   const usbCode = data?.global_info?.orientation?.usb;
   const ledCode = data?.global_info?.orientation?.led;
 
-  // Refs let the animation loop read the latest values without the scene
-  // being rebuilt or capturing stale closures.
-  const isPausedRef = useRef(false);
-  const speedRef    = useRef(1);
-  const playbackRef = useRef<Playback | null>(null);
-  const restQuatRef = useRef(new THREE.Quaternion());
-  /** Set to put the device back at its rest pose (and replay at frame 0) on the next frame. */
-  const needsResetRef = useRef(true);
-  const liveRef = useRef(false);
-  /** Gyro readings received since the last frame, while live. */
-  const liveQueueRef = useRef<Triple[]>([]);
+  const visible = compare ? views : views.slice(0, 1);
+  const size = compare ? COMPARE_PANE_SIZE : PANE_SIZE;
 
-  // React state drives button rendering only.
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [speed, setSpeed]         = useState(1);
-  const [showAxes, setShowAxes]   = useState(false);
-  const [liveWanted, setLiveWanted] = useState(false);
-  const showAxesRef = useRef(showAxes);
+  // Shared by every pane (see createPaneScene).
+  const [camera] = useState(() => {
+    const cam = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    cam.position.copy(CAMERA_HOME);
+    return cam;
+  });
+  const [target] = useState(() => new THREE.Vector3());
 
-  // Auto-play whenever a new recording is selected (adjusting state on a prop
-  // change during render, rather than in an effect).
-  const [prevImuData, setPrevImuData] = useState(imuData);
-  if (imuData !== prevImuData) {
-    setPrevImuData(imuData);
-    setIsPlaying(true);
-    setLiveWanted(false);
+  // React state drives button rendering; refs carry the same values to the
+  // animation loop.
+  const [paused, setPaused] = useState(false);
+  const speed = slowMotion ? 0.5 : 1;
+  const [showAxes, setShowAxes] = useState(false);
+  const pausedRef = useRef(paused);
+  const speedRef = useRef(speed);
+  useEffect(() => {
+    pausedRef.current = paused;
+    speedRef.current = speed;
+  }, [paused, speed]);
+
+  // Auto-play whenever a pane gets something new to show (adjusting state on
+  // a prop change during render, rather than in an effect).
+  const [prevViews, setPrevViews] = useState(views);
+  if (views !== prevViews) {
+    setPrevViews(views);
+    setPaused(false);
   }
 
-  const hasData = !!imuData && imuData.length > 0;
-  const isReplaying = hasData && isPlaying;
-  // Live is offered only while nothing is replaying or being recorded; a
-  // recording pauses it, and it picks up again afterwards.
-  const canGoLive = isStreaming && !isRecording && !isReplaying;
-  const isLive = liveWanted && isStreaming && !isRecording;
+  const panesRef = useRef<(PaneScene | null)[]>([]);
+  const playbacksRef = useRef<(Playback | null)[]>([]);
+  const restQuatRef = useRef(new THREE.Quaternion());
+  /** Replay clock, in samples, shared by every pane. */
+  const clockRef = useRef(0);
+  /** Set to put every pane back at its rest pose and restart the clock on the next frame. */
+  const needsResetRef = useRef(true);
+  /** Pane following the sensor stream, or -1. */
+  const liveIndexRef = useRef(-1);
+  /** Set to put the live pane back at its rest pose on the next frame. */
+  const liveResetRef = useRef(false);
+  /** Gyro readings received since the last frame, for the live pane. */
+  const liveQueueRef = useRef<Triple[]>([]);
 
-  // Holds the axes indicator once the model has loaded, so the showAxes
-  // effect can toggle it without touching the scene.
-  const axesHelperRef = useRef<THREE.Group | null>(null);
+  const register = useCallback((index: number, pane: PaneScene | null) => {
+    panesRef.current[index] = pane;
+    if (pane) needsResetRef.current = true; // start in step with the others
+  }, []);
 
-  // Holds the OrbitControls instance so the "Reset view" button can call
-  // .reset() without needing its own effect.
-  const controlsRef = useRef<OrbitControls | null>(null);
-  const handleResetView = () => controlsRef.current?.reset();
-
-  const handleResetPosition = () => {
+  // New sources → restart every pane together from the rest pose.
+  useEffect(() => {
+    playbacksRef.current = (compare ? views : views.slice(0, 1)).map(createPlayback);
     needsResetRef.current = true;
-  };
+  }, [views, compare]);
 
-  const handleTogglePlay = () => {
-    isPausedRef.current = !isPausedRef.current;
-    setIsPlaying(!isPausedRef.current);
-    if (!isPausedRef.current) setLiveWanted(false); // playing replaces live
-  };
-
-  const handleToggleLive = () => {
-    if (!liveWanted) {
-      isPausedRef.current = true;
-      setIsPlaying(false);
-    }
-    setLiveWanted(!liveWanted);
-  };
-
-  useOtaEvent("sensor", ({ gyro }) => {
-    if (!liveRef.current) return;
-    const queue = liveQueueRef.current;
-    queue.push([gyro.x, gyro.y, gyro.z]);
-    if (queue.length > MAX_LIVE_BACKLOG) queue.shift();
-  });
-
-  const handleToggleSpeed = () => {
-    const next = speedRef.current === 1 ? 0.5 : 1;
-    speedRef.current = next;
-    setSpeed(next);
-  };
-
+  // The live pane follows the stream once it's running, from the rest pose.
+  const liveIndex = isStreaming ? visible.findIndex((v) => v?.kind === "live") : -1;
   useEffect(() => {
-    showAxesRef.current = showAxes;
-    if (axesHelperRef.current) axesHelperRef.current.visible = showAxes;
-  }, [showAxes]);
-
-  // New samples → restart playback from the rest pose.
-  useEffect(() => {
-    playbackRef.current = createPlayback(imuData);
-    isPausedRef.current = false;
-    needsResetRef.current = true;
-  }, [imuData]);
-
-  // Entering or leaving live view starts from the rest pose (a paused replay
-  // then resumes from its beginning).
-  useEffect(() => {
-    liveRef.current = isLive;
+    liveIndexRef.current = liveIndex;
     liveQueueRef.current = [];
-    needsResetRef.current = true;
-  }, [isLive]);
+    liveResetRef.current = true;
+  }, [liveIndex]);
 
   // New orientation config → new rest pose.
   useEffect(() => {
@@ -284,274 +486,197 @@ const GestureVisualizer = ({ imuData, isStreaming, isRecording }: GestureVisuali
     needsResetRef.current = true;
   }, [usbCode, ledCode]);
 
-  // ── Scene: built once per mount ─────────────────────────────────────────
+  useOtaEvent("sensor", ({ gyro }) => {
+    if (liveIndexRef.current < 0) return;
+    const queue = liveQueueRef.current;
+    queue.push([gyro.x, gyro.y, gyro.z]);
+    if (queue.length > MAX_LIVE_BACKLOG) queue.shift();
+  });
+
+  // ── Animation loop: one for every pane ─────────────────────────────────
   useEffect(() => {
-    const mount = mountRef.current;
-    if (!mount) return;
-    let disposed = false;
-
-    const scene = new THREE.Scene();
-
-    // PerspectiveCamera(fov, aspectRatio, near, far)
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    camera.position.set(0, 0, 50);
-
-    // alpha + a transparent clear colour let the viz blend into the page.
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(CANVAS_SIZE, CANVAS_SIZE);
-    renderer.setClearColor(0x000000, 0);
-    mount.appendChild(renderer.domElement);
-
-    // Lets the user click-and-drag to orbit the camera around the device.
-    // Orbiting only ever moves the camera, never the model, so the
-    // configured rest pose stays where it's set. .reset() (the "Reset view"
-    // button) restores the camera captured here.
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 0, 0);
-    controls.update();
-    controlsRef.current = controls;
-
-    // ── Lighting ─────────────────────────────────────────────────────────────
-    const light = new THREE.DirectionalLight(0xffffff, 1);
-    light.position.set(5, 5, 5);
-    scene.add(light);
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-
-    // ── Materials ─────────────────────────────────────────────────────────────
-    const shaderMaterial = new THREE.ShaderMaterial({
-      vertexShader: `
-        varying vec3 vNormal;
-        void main() {
-          vNormal = normalize(normalMatrix * normal);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        }
-      `,
-      fragmentShader: `
-        varying vec3 vNormal;
-        void main() {
-          float t = 0.5 * (1.0 + dot(vNormal, normalize(vec3(1.0, 1.0, 0.5))));
-          vec3 dark  = vec3(0.50, 0.50, 0.50);
-          vec3 light = vec3(0.85, 0.85, 0.85);
-          gl_FragColor = vec4(mix(light, dark, t), 1.0);
-        }
-      `,
-    });
-
-    // ── Model ─────────────────────────────────────────────────────────────────
-    // deviceGroup carries the rest pose + replayed motion; meshGroup the
-    // static STL→IMU axis correction.
-    const deviceGroup = new THREE.Group();
-    scene.add(deviceGroup);
-    const meshGroup = new THREE.Group();
-    meshGroup.rotation.copy(MESH_CORRECTION_EULER);
-    deviceGroup.add(meshGroup);
-
-    let sharedGeometry: THREE.BufferGeometry | null = null;
-    loadCatoGeometry().then(
-      (geometry) => {
-        if (disposed) return;
-        sharedGeometry = geometry;
-        const mesh = new THREE.Mesh(geometry, shaderMaterial);
-        mesh.scale.set(0.5, 0.5, 0.5);
-        meshGroup.add(mesh);
-
-        // No offset relative to meshGroup, so these are the STL file's own
-        // raw axes (no IMU-alignment correction applied).
-        const axesHelper = createAxesIndicator(25, 0.4);
-        axesHelper.visible = showAxesRef.current;
-        mesh.add(axesHelper);
-        axesHelperRef.current = axesHelper;
-      },
-      (err) => console.error("GestureVisualizer: failed to load cato model.stl", err),
-    );
-
-    // ── Animation loop ────────────────────────────────────────────────────────
-    // Playback is paced by elapsed time: `accum` collects how many samples
-    // are due (SAMPLE_RATE_HZ × speed per second) and whole ones are
-    // consumed, so 1× is real time on any display refresh rate.
     let animId = 0;
     let lastTime = performance.now();
 
-    // Reused across frames to avoid allocating a new Vector3/Quaternion per sample.
-    const deltaRotVec = new THREE.Vector3();
-    const deltaQuat = new THREE.Quaternion();
-
-    const resetPose = () => {
-      deviceGroup.position.set(0, 0, 0);
-      deviceGroup.quaternion.copy(restQuatRef.current);
-    };
-
-    // Integrate body-frame angular velocity as a quaternion rotation rather
-    // than summing independent Euler angles — Euler axes aren't orthogonal
-    // once more than one axis is active (each later axis in the rotation
-    // order inherits a tilt from whatever the earlier axes have already
-    // accumulated), which warps the apparent rotation axis over time.
-    // Composing a small quaternion per sample and right-multiplying it onto
-    // the current orientation (i.e. applying it in the device's own local
-    // frame, matching how gyro data is measured) avoids that entirely.
-    const applyGyro = (gyro: Triple) => {
-      deltaRotVec.set(
-        THREE.MathUtils.degToRad(-gyro[0] / SAMPLE_RATE_HZ),
-        THREE.MathUtils.degToRad(gyro[1] / SAMPLE_RATE_HZ),
-        THREE.MathUtils.degToRad(-gyro[2] / SAMPLE_RATE_HZ),
-      );
-      const angle = deltaRotVec.length();
-      if (angle > 0) {
-        deltaQuat.setFromAxisAngle(deltaRotVec.normalize(), angle);
-        deviceGroup.quaternion.multiply(deltaQuat);
-      }
+    const resetPane = (pane: PaneScene) => {
+      pane.device.position.set(0, 0, 0);
+      pane.device.quaternion.copy(restQuatRef.current);
+      pane.frame = 0;
     };
 
     function animate(now: number) {
       animId = requestAnimationFrame(animate);
       const elapsed = Math.min(MAX_FRAME_MS, now - lastTime);
       lastTime = now;
-      controls.update();
 
-      const pb = playbackRef.current;
+      const panes = panesRef.current;
+      const playbacks = playbacksRef.current;
+
       if (needsResetRef.current) {
-        resetPose();
-        if (pb) {
-          pb.frame = 0;
-          pb.accum = 0;
-        }
-        needsResetRef.current = false;
-      }
-
-      // Live: apply every reading that arrived since the last frame, at the
-      // device's own pace. Rotation only — with no recording to take a
-      // gravity baseline from, double-integrated acceleration would just
-      // drift the model off screen.
-      if (liveRef.current) {
-        for (const gyro of liveQueueRef.current) applyGyro(gyro);
+        clockRef.current = 0;
+        for (const pane of panes) if (pane) resetPane(pane);
         liveQueueRef.current = [];
-        renderer.render(scene, camera);
-        return;
+        needsResetRef.current = false;
+        liveResetRef.current = false;
+      }
+      if (liveResetRef.current) {
+        const live = panes[liveIndexRef.current];
+        if (live) resetPane(live);
+        liveResetRef.current = false;
       }
 
-      if (!pb || meshGroup.children.length === 0 || isPausedRef.current) {
-        renderer.render(scene, camera);
-        return;
-      }
-
-      pb.accum += (elapsed / 1000) * SAMPLE_RATE_HZ * speedRef.current;
-
-      while (pb.accum >= 1) {
-        pb.accum -= 1;
-
-        if (pb.frame >= pb.samples.length) {
-          // Loop: reset to starting pose and replay from the beginning.
-          resetPose();
-          pb.frame = 0;
+      // One clock for every replay, so compared gestures stay in step. It
+      // counts samples (SAMPLE_RATE_HZ × speed per second, so 1× is real
+      // time on any display refresh rate), waits until every replaying pane
+      // has its model, and loops once the longest replay has finished.
+      const loopLength = Math.max(0, ...playbacks.map((pb) => pb?.samples.length ?? 0));
+      const ready = playbacks.every((pb, i) => !pb || panes[i]?.isReady());
+      if (loopLength > 0 && ready && !pausedRef.current) {
+        clockRef.current += (elapsed / 1000) * SAMPLE_RATE_HZ * speedRef.current;
+        if (clockRef.current >= loopLength) {
+          clockRef.current = 0;
+          playbacks.forEach((pb, i) => {
+            const pane = panes[i];
+            if (pb && pane) resetPane(pane);
+          });
         }
-
-        const { acc, gyro } = pb.samples[pb.frame];
-        applyGyro(gyro);
-
-        deviceGroup.position.x += (acc[0] - pb.meanAcc[0]) / 500;
-        deviceGroup.position.y += (acc[1] - pb.meanAcc[1]) / 500;
-        deviceGroup.position.z += (acc[2] - pb.meanAcc[2]) / 500;
-
-        pb.frame++;
       }
 
-      renderer.render(scene, camera);
+      panes.forEach((pane, i) => {
+        if (!pane) return;
+        const pb = playbacks[i];
+        if (pb) {
+          // Catch up with the clock; a shorter replay holds its last pose
+          // until the loop restarts.
+          const due = Math.min(Math.floor(clockRef.current), pb.samples.length);
+          for (; pane.frame < due; pane.frame++) {
+            const { acc, gyro } = pb.samples[pane.frame];
+            applyGyro(pane.device, gyro);
+            pane.device.position.x += (acc[0] - pb.meanAcc[0]) / 500;
+            pane.device.position.y += (acc[1] - pb.meanAcc[1]) / 500;
+            pane.device.position.z += (acc[2] - pb.meanAcc[2]) / 500;
+          }
+        } else if (i === liveIndexRef.current) {
+          // Live: apply every reading that arrived since the last frame, at
+          // the device's own pace. Rotation only — with no recording to take
+          // a gravity baseline from, double-integrated acceleration would
+          // just drift the model off screen.
+          for (const gyro of liveQueueRef.current) applyGyro(pane.device, gyro);
+          liveQueueRef.current = [];
+        }
+        pane.render();
+      });
     }
 
     animId = requestAnimationFrame(animate);
-
-    // ── Cleanup ───────────────────────────────────────────────────────────────
-    return () => {
-      disposed = true;
-      cancelAnimationFrame(animId);
-      controls.dispose();
-      controlsRef.current = null;
-      axesHelperRef.current = null;
-      disposeTree(scene, new Set([sharedGeometry])); // the STL geometry is shared
-      shaderMaterial.dispose();
-      renderer.dispose();
-      renderer.forceContextLoss(); // release the WebGL context now, not at GC
-      if (renderer.domElement.parentNode === mount) mount.removeChild(renderer.domElement);
-    };
+    return () => cancelAnimationFrame(animId);
   }, []);
 
-  const showScene = hasData || isLive;
-  const emptyMsg = liveWanted && isRecording
-    ? "Live view resumes after recording."
-    : "Select a gesture to visualize, or choose Live to follow Cato in real time.";
-  const liveTitle = !isStreaming
-    ? "Waiting for the sensor stream"
-    : isRecording
-      ? "Unavailable while recording"
-      : isReplaying
-        ? "Pause the replay to go live"
-        : isLive
-          ? "Stop the live view"
-          : "Follow Cato's movement in real time";
+  const handleResetView = () => {
+    camera.position.copy(CAMERA_HOME);
+    camera.zoom = 1;
+    camera.updateProjectionMatrix();
+    target.set(0, 0, 0);
+  };
+
+  const hasReplay = visible.some((v) => v && v.kind !== "live");
+  const targetIsLive = views[targetView]?.kind === "live";
+  const liveTitle = isRecording
+    ? "Unavailable while recording"
+    : targetIsLive
+      ? isStreaming
+        ? "Stop the live view"
+        : "Starting the sensor stream…"
+      : compare
+        ? "Show Cato's movement in real time on the highlighted side"
+        : "Follow Cato's movement in real time";
 
   return (
-    <div className={styles.visualizerWrap}>
-      {!showScene && <p className={styles.emptyMsg}>{emptyMsg}</p>}
-      <div ref={mountRef} style={showScene ? undefined : { display: "none" }} />
+    <div className={styles.visualizer}>
+      <div className={styles.vizPanes}>
+        {visible.map((source, i) => (
+          <ViewerPane
+            key={i}
+            index={i}
+            source={source}
+            size={size}
+            showAxes={showAxes}
+            camera={camera}
+            target={target}
+            register={register}
+            side={compare ? (i === 0 ? "Left" : "Right") : null}
+            isTarget={compare && i === targetView}
+            onTarget={() => setTargetView(i)}
+            overlay={i === 0 ? overlay : undefined}
+          />
+        ))}
+      </div>
 
       <div className={styles.vizControls}>
-        {hasData && (
+        {hasReplay && (
           <>
             <button
               className={styles.vizBtn}
-              onClick={handleTogglePlay}
-              title={isPlaying ? "Pause" : "Play"}
-              aria-label={isPlaying ? "Pause" : "Play"}
+              onClick={() => setPaused(!paused)}
+              title={paused ? "Play" : "Pause"}
+              aria-label={paused ? "Play" : "Pause"}
             >
-              {isPlaying ? "⏸" : "▶"}
+              {paused ? "▶" : "⏸"}
             </button>
             <button
-              className={`${styles.vizBtn} ${speed === 0.5 ? styles.vizBtnActive : ""}`}
-              onClick={handleToggleSpeed}
-              title={speed === 0.5 ? "Normal speed" : "Slow motion"}
-              aria-pressed={speed === 0.5}
+              className={`${styles.vizBtn} ${slowMotion ? styles.vizBtnActive : ""}`}
+              onClick={() => setSlowMotion(!slowMotion)}
+              title={slowMotion ? "Normal speed" : "Slow motion"}
+              aria-pressed={slowMotion}
             >
               ½×
             </button>
           </>
         )}
         <button
-          className={`${styles.vizBtn} ${isLive ? styles.vizBtnActive : ""}`}
-          onClick={handleToggleLive}
-          disabled={!isLive && !canGoLive}
+          className={`${styles.vizBtn} ${targetIsLive ? styles.vizBtnActive : ""}`}
+          onClick={toggleLive}
+          disabled={isRecording}
           title={liveTitle}
-          aria-pressed={isLive}
+          aria-pressed={targetIsLive}
         >
           Live
         </button>
-        {showScene && (
-          <>
-            <button
-              className={styles.vizBtn}
-              onClick={handleResetPosition}
-              title="Reset position"
-              aria-label="Reset position"
-            >
-              ⌂
-            </button>
-            <button
-              className={styles.vizBtn}
-              onClick={handleResetView}
-              title="Reset camera view"
-              aria-label="Reset camera view"
-            >
-              ⟲
-            </button>
-            <label className={styles.checkLabel} title="Show the STL file's own raw X/Y/Z axes, unadjusted for the IMU's orientation">
-              <input
-                type="checkbox"
-                checked={showAxes}
-                onChange={(e) => setShowAxes(e.target.checked)}
-              />
-              Show axes
-            </label>
-          </>
-        )}
+        <button
+          className={styles.vizBtn}
+          onClick={() => {
+            needsResetRef.current = true;
+          }}
+          title="Reset position"
+          aria-label="Reset position"
+        >
+          ⌂
+        </button>
+        <button
+          className={styles.vizBtn}
+          onClick={handleResetView}
+          title="Reset camera view"
+          aria-label="Reset camera view"
+        >
+          ⟲
+        </button>
+        <button
+          className={`${styles.vizBtn} ${compare ? styles.vizBtnActive : ""}`}
+          onClick={() => setCompare(!compare)}
+          disabled={isRecording}
+          title={compare ? "Show one view" : "Show two views side by side, in sync"}
+          aria-pressed={compare}
+        >
+          Compare
+        </button>
+        <label className={styles.checkLabel} title="Show the STL file's own raw X/Y/Z axes, unadjusted for the IMU's orientation">
+          <input
+            type="checkbox"
+            checked={showAxes}
+            onChange={(e) => setShowAxes(e.target.checked)}
+          />
+          Show axes
+        </label>
       </div>
     </div>
   );

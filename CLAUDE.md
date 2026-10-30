@@ -32,7 +32,7 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
     │                       # backup validation), leafValue, configFile (backup/restore), releases
     ├── types/              # device.ts, config.ts, gestures.ts
     ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
-    │                       # lib/templateGen.ts, hooks/ (sensor stream/recorder), state/ (store)
+    │                       # lib/templateGen.ts, lib/recordingFile.ts (recordings export/import), hooks/ (sensor stream, recorder, recording take), state/ (store)
     ├── components/
     │   ├── ui/             # Shell (tab registry), Toaster, PwaUpdater (service worker +
     │   │                   # update prompt), HoverClickButton, base UI chrome

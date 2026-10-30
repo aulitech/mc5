@@ -3,13 +3,15 @@ import ota from "../../../device/ota";
 import { errorMessage, notify } from "../../../lib/notify";
 
 /**
- * Turn the device's IMU stream on while the calling component is mounted.
- * Returns true once the device has confirmed the stream is running.
+ * Turn the device's IMU stream on while `enabled` (and the calling component
+ * is mounted), and off again afterwards. Returns true once the device has
+ * confirmed the stream is running.
  */
-export function useSensorStream() {
+export function useSensorStream(enabled: boolean) {
   const [isStreaming, setIsStreaming] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     let active = true;
     ota
       .send("sensor_stream on")
@@ -24,11 +26,12 @@ export function useSensorStream() {
 
     return () => {
       active = false;
+      setIsStreaming(false);
       ota
         .send("sensor_stream off")
         .catch((err) => console.log("[gestures] sensor_stream off failed:", errorMessage(err)));
     };
-  }, []);
+  }, [enabled]);
 
   return isStreaming;
 }
