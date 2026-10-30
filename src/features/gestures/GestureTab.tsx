@@ -6,6 +6,7 @@
 //
 // Data flow:
 //   saved gestures list → store.selectGesture → viewer goes live, Record shown
+//   (hidden again while a recording or standard gesture replays)
 //   Record → useGestureTake (device sensor events) → Accept → store.addRecording
 //   store.views (one pane, or two when comparing) → GestureVisualizer, which
 //   replays recordings or follows the device sensor events live
@@ -26,9 +27,14 @@ const RECORD_MS = 2500;
 
 const GestureTabContent = () => {
   const { views, compare, activeGesture, selectGesture, addRecording, resetPosition } = useGestureStore();
-  const showsLive = (compare ? views : views.slice(0, 1)).some((v) => v?.kind === "live");
+  const visible = compare ? views : views.slice(0, 1);
+  const showsLive = visible.some((v) => v?.kind === "live");
+  const replaying = visible.some((v) => v !== null && v.kind !== "live");
   const isStreaming = useSensorStream(activeGesture !== null || showsLive);
   const take = useGestureTake(RECORD_MS, addRecording);
+  // Record stays out of the way of a replay (choosing the gesture or Live
+  // brings it back); a take already under way keeps its controls.
+  const showRecordControls = activeGesture !== null && (take.phase !== "idle" || !replaying);
 
   const handleRecord = () => {
     if (!activeGesture) return;
@@ -54,7 +60,7 @@ const GestureTabContent = () => {
                 isStreaming={isStreaming}
                 isRecording={take.phase !== "idle"}
                 overlay={
-                  activeGesture !== null && (
+                  showRecordControls && (
                     <RecordOverlay gestureName={activeGesture} take={take} onRecord={handleRecord} />
                   )
                 }
