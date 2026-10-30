@@ -85,6 +85,10 @@ them fails. Don't skip it with `--no-verify`.
 - **PWA and offline**: the service worker exists only in production builds,
   not under `npm run dev`. To test installing, offline use or the update
   prompt, run `npm run build && npm run preview` (http://localhost:4173).
+  Only Netlify's production deploy is an offline app. The `dev` branch
+  deploy and PR previews ship a worker that clears its cache and removes
+  itself, so they always load the latest build (see
+  [vite.config.ts](vite.config.ts)).
   - In Chrome DevTools, use **Application → Service workers** with
     **Offline** ticked.
   - To see the update prompt, rebuild while the preview page is open, then
