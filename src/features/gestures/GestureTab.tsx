@@ -5,13 +5,16 @@
 // a pane is live.
 //
 // Data flow:
-//   saved gestures list → store.selectGesture → viewer goes live, Record shown
+//   "+ Gesture" or the saved gestures list → store.selectGesture → viewer goes
+//   live, Record shown
 //   (hidden again while a recording or standard gesture replays)
 //   Record → useGestureTake (device sensor events) → Accept → store.addRecording
 //   store.views (one pane, or two when comparing) → GestureVisualizer, which
 //   replays recordings or follows the device sensor events live
-//   checked classes/standard gestures → Generate model (ModelList) → store.generateModel
+//   checked classes/standard gestures → "+ Model" (ModelList) → store.generateModel
 
+import { Plus } from "lucide-react";
+import { useDialog } from "../../context/DialogContext";
 import GestureSummary from "./components/GestureSummary";
 import GestureVisualizer from "./components/GestureVisualizer";
 import ModelList from "./components/ModelList";
@@ -35,6 +38,13 @@ const GestureTabContent = () => {
   // Record stays out of the way of a replay (choosing the gesture or Live
   // brings it back); a take already under way keeps its controls.
   const showRecordControls = activeGesture !== null && (take.phase !== "idle" || !replaying);
+  const { prompt } = useDialog();
+
+  // Name a new gesture; it's chosen for recording (it joins the list with its first take).
+  const handleNewGesture = async () => {
+    const name = (await prompt("Name the new gesture:"))?.trim();
+    if (name) selectGesture(name);
+  };
 
   const handleRecord = () => {
     if (!activeGesture) return;
@@ -47,7 +57,14 @@ const GestureTabContent = () => {
     <div className={styles.container}>
       <div className={styles.mainLayout}>
         <div className={styles.pageSection}>
-          <h3 className={styles.pageSectionTitle}>Gesture Recordings</h3>
+          {/* Heading, with "+ Gesture" under it (like "Add Profile") */}
+          <div className={styles.pageSectionHeader}>
+            <h3 className={styles.pageSectionTitle}>Gestures</h3>
+            <button className={`btn-primary ${styles.addBtn}`} onClick={handleNewGesture}>
+              <Plus size={16} />
+              Gesture
+            </button>
+          </div>
           <div className={styles.pageSectionBody}>
             {/* Column 1: saved gestures (choose one to record) */}
             <div className={styles.leftPanel}>
@@ -70,10 +87,7 @@ const GestureTabContent = () => {
         </div>
 
         <div className={styles.pageSection}>
-          <h3 className={styles.pageSectionTitle}>Gesture Models</h3>
-          <div className={styles.pageSectionBody}>
-            <ModelList />
-          </div>
+          <ModelList />
         </div>
       </div>
     </div>

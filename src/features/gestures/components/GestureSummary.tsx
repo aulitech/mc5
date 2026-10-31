@@ -2,7 +2,7 @@
 //
 // Clicking a class chooses it as the gesture to record (the viewer goes live,
 // with Record over it); its disclosure arrow shows or hides its recordings.
-// "New gesture" names a new one. Classes are listed in the user's order —
+// "+ Gesture" (in the tab's heading) names a new one. Classes are listed in the user's order —
 // dragged by their handles (or moved with ↑/↓ on a focused handle) — else in
 // the order they were created; never alphabetically. From the list the user
 // can also:
@@ -95,11 +95,6 @@ function GestureSummary() {
     store.moveGesture(name, store.gestureOrder.indexOf(name) + delta);
   };
 
-  const handleNewGesture = async () => {
-    const name = (await prompt("Name the new gesture:"))?.trim();
-    if (name) store.selectGesture(name);
-  };
-
   const handleDeleteClass = async (e: MouseEvent, name: string) => {
     e.stopPropagation(); // don't also choose the gesture
     if (!(await confirm(`Delete all recordings for "${name}"?`))) return;
@@ -143,12 +138,8 @@ function GestureSummary() {
 
   return (
     <div className={styles.summary}>
-      <button className={styles.btn} onClick={handleNewGesture}>
-        New gesture
-      </button>
-
       {entries.length === 0 && !pending && (
-        <p className={styles.emptyMsg}>No recordings yet. Choose New gesture to record one.</p>
+        <p className={styles.emptyMsg}>No recordings yet. Click + Gesture to record one.</p>
       )}
 
       <ul className={styles.summaryList}>
@@ -262,7 +253,12 @@ function GestureSummary() {
                       </button>
                     </li>
                   ))}
-                  {pending && (
+      </ul>
+              )}
+            </li>
+          );
+        })}
+        {pending && (
           <li className={styles.classGroup}>
             <div className={`${styles.summaryItem} ${styles.selected}`}>
               {/* Nothing to drag or show until its first take is saved */}
@@ -274,11 +270,27 @@ function GestureSummary() {
           </li>
         )}
       </ul>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+
+      {/* Recordings files */}
+      <div className={styles.recordingFileActions}>
+        <button
+          className={styles.btn}
+          onClick={handleImport}
+          title="Add recordings from files exported by MyCato"
+          aria-label="Import recordings"
+        >
+          Import…
+        </button>
+        <button
+          className={styles.btn}
+          onClick={handleExport}
+          aria-label="Export recordings"
+          disabled={entries.length === 0}
+          title="Save every recording to one file, to back them up or import elsewhere"
+        >
+          Export…
+        </button>
+      </div>
 
       {/* ── Standard gestures ── */}
       <div className={styles.standardDivider} />
@@ -314,29 +326,6 @@ function GestureSummary() {
           </li>
         ))}
       </ul>
-
-      {/* ── Recordings files ── */}
-      <div className={styles.standardDivider} />
-      <h4 className={styles.standardGesturesHeading}>Recordings</h4>
-      <div className={styles.recordingFileActions}>
-        <button
-          className={styles.btn}
-          onClick={handleImport}
-          title="Add recordings from files exported by MyCato"
-          aria-label="Import recordings"
-        >
-          Import…
-        </button>
-        <button
-          className={styles.btn}
-          onClick={handleExport}
-          aria-label="Export recordings"
-          disabled={entries.length === 0}
-          title="Save every recording to one file, to back them up or import elsewhere"
-        >
-          Export…
-        </button>
-      </div>
     </div>
   );
 }
