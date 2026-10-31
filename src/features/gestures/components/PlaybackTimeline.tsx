@@ -2,7 +2,7 @@
 //
 // Ticks every 0.1 s (minor), 0.5 s (intermediate) and 1 s (major, labelled),
 // across the pane's replay. The playhead follows the visualizer's shared
-// replay clock and shows the time in ms; when comparing, the shorter replay's
+// replay clock and shows the time in seconds (x.xxx); when comparing, the shorter replay's
 // playhead waits at its end until the loop restarts. Dragging anywhere on the
 // ruler, or using the arrow keys on the playhead, moves the clock for every
 // pane; the replays hold still while it's dragged.
@@ -44,8 +44,9 @@ const PlaybackTimeline = ({ length, sampleRate, clockRef, onSeek, onScrub }: Pla
       shownMs = ms;
       headRef.current!.style.left = `${(clock / length) * 100}%`;
       headRef.current!.setAttribute("aria-valuenow", String(ms));
-      headRef.current!.setAttribute("aria-valuetext", `${ms} ms`);
-      readoutRef.current!.textContent = `${ms} ms`;
+      const seconds = (ms / 1000).toFixed(3);
+      headRef.current!.setAttribute("aria-valuetext", `${seconds} seconds`);
+      readoutRef.current!.textContent = seconds;
     };
     animId = requestAnimationFrame(follow);
     return () => cancelAnimationFrame(animId);

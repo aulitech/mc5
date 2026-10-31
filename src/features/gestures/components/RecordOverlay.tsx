@@ -49,10 +49,10 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
         )}
         {reviewing && (
           <>
-            <button className={styles.btnAccept} onClick={take.accept} disabled={phase === "saving"}>
+            <button className={`${styles.btn} ${styles.vizAcceptBtn}`} onClick={take.accept} disabled={phase === "saving"}>
               {phase === "saving" ? "Saving…" : "Accept"}
             </button>
-            <button className={styles.btnReject} onClick={take.reject} disabled={phase === "saving"}>
+            <button className={`${styles.btn} ${styles.vizRejectBtn}`} onClick={take.reject} disabled={phase === "saving"}>
               Reject
             </button>
           </>

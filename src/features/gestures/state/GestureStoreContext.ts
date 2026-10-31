@@ -50,7 +50,7 @@ export interface GestureStore {
   selectStandard: (id: string) => Promise<void>;
   /** Show the live sensor stream in the target pane, or clear it if it already does. */
   toggleLive: () => void;
-  /** Bumped to put every pane back at its rest pose (Record, "Reset position"). */
+  /** Bumped to put every pane back at its rest pose (pressing Record). */
   positionResets: number;
   resetPosition: () => void;
   /** Replays at half speed. */

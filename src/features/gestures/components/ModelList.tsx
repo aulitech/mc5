@@ -1,8 +1,9 @@
-// ModelList.tsx — Gesture models: generate one from the checked gestures,
-// select one to chart its templates, show its gestures, install it (save the
-// device's xcorr_model.zip), or delete it.
+// ModelList.tsx — The Models section: "+ Model" (under its heading)
+// generates a gesture model from the checked gestures; select one to chart
+// its templates, show its gestures, install it (save the device's
+// xcorr_model.zip), or delete it.
 
-import { HardDriveDownload, Trash2 } from "lucide-react";
+import { HardDriveDownload, Plus, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useDialog } from "../../../context/DialogContext";
 import { downloadBlob, saveWithPicker } from "../../../lib/configFile";
@@ -42,7 +43,7 @@ function ModelList() {
   const nothingChecked = checkedClasses.size === 0 && checkedStandards.size === 0;
 
   const handleGenerate = async () => {
-    const modelName = (await prompt("Name this gesture model:"))?.trim();
+    const modelName = (await prompt("Name this model:"))?.trim();
     if (modelName) await generateModel(modelName);
   };
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -66,107 +67,111 @@ function ModelList() {
 
   return (
     <>
-      {/* Column 3: Gesture Models */}
-      <div className={styles.leftPanel}>
-        <div className={styles.modelsSection}>
-          <div className={styles.modelActions}>
-            <button
-              className={styles.btn}
-              onClick={handleGenerate}
-              disabled={nothingChecked || isGenerating}
-              title={nothingChecked ? "Check saved or standard gestures first" : "Build a model from the checked gestures"}
-            >
-              {isGenerating ? "Generating…" : "Generate model…"}
-            </button>
+      {/* Heading, with "+ Model" under it (like "Add Profile") */}
+      <div className={styles.pageSectionHeader}>
+        <h3 className={styles.pageSectionTitle}>Models</h3>
+        <button
+          className={`btn-primary ${styles.addBtn}`}
+          onClick={handleGenerate}
+          disabled={nothingChecked || isGenerating}
+          title={nothingChecked ? "Check saved or standard gestures first" : "Build a model from the checked gestures"}
+        >
+          <Plus size={16} />
+          {isGenerating ? "Generating…" : "Model"}
+        </button>
+      </div>
+      <div className={styles.pageSectionBody}>
+        <div className={styles.leftPanel}>
+          <div className={styles.modelsSection}>
+            {models.length === 0 ? (
+              <p className={styles.emptyMsg}>Check gestures in the list on the left, then click + Model.</p>
+            ) : (
+              <ul className={styles.modelList}>
+                {models.map((model) => {
+                  const open = openIds.has(model.id);
+                  return (
+                    <li
+                      key={model.id}
+                      className={`${styles.modelCard} ${model.id === selectedId ? styles.modelCardSelected : ""}`}
+                      onClick={() => setSelectedId((prev) => (prev === model.id ? null : model.id))}
+                      style={{ cursor: "pointer" }}
+                    >
+                      <div className={styles.modelCardHeader}>
+                        <button
+                          className={`btn-plain ${styles.disclosure} ${open ? styles.disclosureOpen : ""}`}
+                          onClick={(e) => toggleOpen(e, model.id)}
+                          aria-expanded={open}
+                          aria-label={`${open ? "Hide" : "Show"} the gestures in "${model.modelName}"`}
+                          title={`${open ? "Hide" : "Show"} gestures`}
+                        >
+                          <DisclosureTriangle />
+                        </button>
+                        <button
+                          className={`btn-plain ${styles.modelName}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedId((prev) => (prev === model.id ? null : model.id));
+                          }}
+                          aria-pressed={model.id === selectedId}
+                          title={`${model.modelName}: show its templates`}
+                        >
+                          {model.modelName}
+                        </button>
+                        <button
+                          className="btn-ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            installModel(model).catch((err) =>
+                              notify.error(`Couldn't save ${MODEL_FILENAME}: ${errorMessage(err)}`),
+                            );
+                          }}
+                          title={`Install: save as ${MODEL_FILENAME} for Cato`}
+                          aria-label={`Install "${model.modelName}" (save ${MODEL_FILENAME})`}
+                        >
+                          <HardDriveDownload size={16} />
+                        </button>
+                        <button
+                          className="btn-ghost btn-danger"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(model);
+                          }}
+                          title="Delete this model"
+                          aria-label={`Delete model "${model.modelName}"`}
+                        >
+                          <Trash2 size={16} color="var(--danger)" />
+                        </button>
+                      </div>
+                      {open && (
+                        <ul className={styles.modelGestureList}>
+                          {Object.keys(model.templates).map((gestureName) => (
+                            <li key={gestureName} className={styles.modelGestureItem}>
+                              {gestureName}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
-          {models.length === 0 ? (
-            <p className={styles.emptyMsg}>Check gestures in the list on the left, then click Generate model.</p>
-          ) : (
-            <ul className={styles.modelList}>
-              {models.map((model) => {
-                const open = openIds.has(model.id);
-                return (
-                  <li
-                    key={model.id}
-                    className={`${styles.modelCard} ${model.id === selectedId ? styles.modelCardSelected : ""}`}
-                    onClick={() => setSelectedId((prev) => (prev === model.id ? null : model.id))}
-                    style={{ cursor: "pointer" }}
-                  >
-                    <div className={styles.modelCardHeader}>
-                      <button
-                        className={`btn-plain ${styles.disclosure} ${open ? styles.disclosureOpen : ""}`}
-                        onClick={(e) => toggleOpen(e, model.id)}
-                        aria-expanded={open}
-                        aria-label={`${open ? "Hide" : "Show"} the gestures in "${model.modelName}"`}
-                        title={`${open ? "Hide" : "Show"} gestures`}
-                      >
-                        <DisclosureTriangle />
-                      </button>
-                      <button
-                        className={`btn-plain ${styles.modelName}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedId((prev) => (prev === model.id ? null : model.id));
-                        }}
-                        aria-pressed={model.id === selectedId}
-                        title={`${model.modelName}: show its templates`}
-                      >
-                        {model.modelName}
-                      </button>
-                      <button
-                        className="btn-ghost"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          installModel(model).catch((err) =>
-                            notify.error(`Couldn't save ${MODEL_FILENAME}: ${errorMessage(err)}`),
-                          );
-                        }}
-                        title={`Install: save as ${MODEL_FILENAME} for Cato`}
-                        aria-label={`Install "${model.modelName}" (save ${MODEL_FILENAME})`}
-                      >
-                        <HardDriveDownload size={16} />
-                      </button>
-                      <button
-                        className="btn-ghost btn-danger"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(model);
-                        }}
-                        title="Delete this model"
-                        aria-label={`Delete model "${model.modelName}"`}
-                      >
-                        <Trash2 size={16} color="var(--danger)" />
-                      </button>
-                    </div>
-                    {open && (
-                      <ul className={styles.modelGestureList}>
-                        {Object.keys(model.templates).map((gestureName) => (
-                          <li key={gestureName} className={styles.modelGestureItem}>
-                            {gestureName}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+        </div>
+
+        {/* Model template charts */}
+        <div className={styles.rightPanel}>
+          {selectedModel && (
+            <div className={styles.modelCharts}>
+              <h4 className={styles.modelChartsTitle}>{selectedModel.modelName}</h4>
+              {Object.entries(selectedModel.templates).map(([gestureName, { template }]) => (
+                <div key={gestureName} className={styles.chartWrap}>
+                  <GestureTemplateChart template={template} gestureName={gestureName} />
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
-
-      {/* Column 4: model template charts */}
-      <div className={styles.rightPanel}>
-        {selectedModel && (
-          <div className={styles.modelCharts}>
-            <h4 className={styles.modelChartsTitle}>{selectedModel.modelName}</h4>
-            {Object.entries(selectedModel.templates).map(([gestureName, { template }]) => (
-              <div key={gestureName} className={styles.chartWrap}>
-                <GestureTemplateChart template={template} gestureName={gestureName} />
-              </div>
-            ))}
-          </div>
-        )}
       </div>
     </>
   );

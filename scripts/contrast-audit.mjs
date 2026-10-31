@@ -78,15 +78,17 @@ const PAIRS = [
   ["--chart-3", "--bg-input", UI],
   ["--color-card", "--bg-input", TEXT],
   ["--color-muted", "--bg", TEXT],
-  // 3D viewer: darkest model shade and deepest axis colour (fixed in
+  // 3D viewer: text and the darkest model shade (fixed in
   // GestureVisualizer.tsx) on the viewer panel
   ["--viz-color", "--viz-bg", TEXT],
-  // Recording timer track drawn over the viewer; the playback timeline's
-  // ticks and labels (--viz-color) and playhead (--viz-danger)
+  // Recording timer track drawn over the viewer; the playback timeline
+  // (ticks, labels and playhead) uses --viz-color
   ["--viz-danger", "--viz-bg", UI],
   ["--viz-success", "--viz-bg", UI],
+  // Accept / Reject labels over the viewer
+  ["--viz-success", "--viz-bg", TEXT],
+  ["--viz-danger", "--viz-bg", TEXT],
   ["#808080", "--viz-bg", UI],
-  ["#f57f17", "--viz-bg", UI],
 ];
 
 // ── Colour maths ──────────────────────────────────────────────────────────────

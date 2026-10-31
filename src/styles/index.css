@@ -179,7 +179,7 @@
   --tooltip-color: light-dark(var(--grey-olive-50), var(--grey-olive-950));
 
   /* 3D gesture viewer panel — dark in both themes (see GestureVisualizer). */
-  --viz-bg: var(--baltic-blue-900);
+  --viz-bg: var(--grey-olive-800);
   --viz-color: var(--grey-olive-200);
   /* Status colours on the (always dark) viewer: the dark-theme ones */
   --viz-danger: var(--dark-danger);

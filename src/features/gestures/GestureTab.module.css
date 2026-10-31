@@ -43,6 +43,24 @@
   gap: 0.6rem;
 }
 
+/* A heading with its add button under it ("+ Gesture", "+ Model"), styled
+   like the Profile tab's "Add Profile". */
+.pageSectionHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+/* btn-primary has no disabled look of its own. */
+.addBtn:disabled,
+.addBtn:disabled:hover {
+  background: var(--primary);
+  color: var(--color-on-primary);
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .pageSectionTitle {
   margin: 0;
   font-size: 1.15rem;
@@ -134,43 +152,17 @@
 }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
-.btn {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.85rem;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-  background: var(--bg-card);
-  color: var(--color);
-  cursor: pointer;
-}
-
+/* Buttons take the app's base style (the plain `button` in styles/index.css,
+   as on the General tab and the toolbar); this only adds a disabled look,
+   which the base style lacks, without its hover fill. */
 .btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
 
-.btn:not(:disabled):hover {
-  background: var(--bg-hover);
-}
-
-.btnAccept {
-  composes: btn;
-  border-color: var(--success);
-  color: var(--success);
-}
-
-.btnAccept:not(:disabled):hover {
-  background: color-mix(in srgb, var(--success) 15%, var(--bg-card));
-}
-
-.btnReject {
-  composes: btn;
-  border-color: var(--danger);
-  color: var(--danger);
-}
-
-.btnReject:not(:disabled):hover {
-  background: color-mix(in srgb, var(--danger) 15%, var(--bg-card));
+.btn:disabled:hover {
+  background-color: var(--bg-button);
+  color: var(--color-button);
 }
 
 /* ── Gesture summary ──────────────────────────────────────────────────────── */
@@ -336,7 +328,7 @@
 /* ── Playback timeline (PlaybackTimeline) ─────────────────────────────────── */
 /* Along the bottom of a replaying pane, over the canvas. Padded at the sides
    so the time readout and the end labels stay inside it. Top to bottom: the
-   playhead's ms readout, ticks rising from a baseline, then the second labels. */
+   playhead's time readout, ticks rising from a baseline, then the second labels. */
 .timeline {
   position: absolute;
   left: 0;
@@ -394,11 +386,11 @@
   left: 0;
   width: 2px;
   height: 18px;
-  background: var(--viz-danger);
+  background: var(--viz-color);
   transform: translateX(-50%);
 }
 
-/* The ms readout, centred over the playhead. */
+/* The time readout (seconds), centred over the playhead. */
 .playheadTime {
   position: absolute;
   bottom: 100%;
@@ -406,7 +398,6 @@
   transform: translateX(-50%);
   padding: 0 0.3rem;
   border-radius: 3px;
-  border: 1px solid var(--viz-danger);
   background: var(--viz-bg);
   font-size: 0.62rem;
   line-height: 12px;
@@ -460,6 +451,11 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.vizCaptionRight {
+  text-align: right;
+  justify-content: flex-end; /* the caption button lays its text out as flex */
 }
 
 /* Leaves room for the turn button in the pane's corner. */
@@ -526,19 +522,31 @@
   pointer-events: auto;
 }
 
-/* Record lets the live model show through. It uses the viewer's own
-   (always dark) colours; at 70% the panel keeps --viz-color text above
-   4.5:1 even over the model's lightest shade. */
-.vizRecordBtn,
-.vizRecordBtn:not(:disabled):hover {
-  background: color-mix(in srgb, var(--viz-bg) 70%, transparent);
-  border-color: color-mix(in srgb, var(--viz-color) 60%, transparent);
+/* Record, Accept and Reject over the model: the base button on a panel in
+   the viewer's own (always dark) colours, with the base hover fill. Record
+   lets the live model show through; at 85% the panel keeps --viz-color text
+   above 4.5:1 even over the model's lightest shade. */
+.vizRecordBtn {
+  background: color-mix(in srgb, var(--viz-bg) 85%, transparent);
   color: var(--viz-color);
   backdrop-filter: blur(3px);
 }
 
-.vizRecordBtn:not(:disabled):hover {
-  background: color-mix(in srgb, var(--viz-bg) 85%, transparent);
+.vizAcceptBtn,
+.vizRejectBtn,
+.vizAcceptBtn:disabled:hover,
+.vizRejectBtn:disabled:hover {
+  background: var(--viz-bg);
+}
+
+.vizAcceptBtn,
+.vizAcceptBtn:disabled:hover {
+  color: var(--viz-success);
+}
+
+.vizRejectBtn,
+.vizRejectBtn:disabled:hover {
+  color: var(--viz-danger);
 }
 
 /* Saving… — disabled but still readable over the model. */
@@ -560,32 +568,6 @@
   padding: 0.2rem 0.4rem;
 }
 
-.vizBtn {
-  padding: 0.15rem 0.45rem;
-  font-size: 0.75rem;
-  border-radius: 3px;
-  border: 1px solid var(--input-border);
-  background: transparent;
-  color: var(--color-card);
-  cursor: pointer;
-  line-height: 1.4;
-}
-
-.vizBtn:not(:disabled):hover {
-  background: var(--bg-hover);
-}
-
-.vizBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.vizBtnActive {
-  border-color: var(--primary);
-  color: var(--primary);
-  background: var(--bg-selected);
-}
-
 /* ── Template chart ───────────────────────────────────────────────────────── */
 .chartWrap {
   width: fit-content;
@@ -605,17 +587,12 @@
   gap: 0.5rem;
 }
 
-/* ── Gesture Models section ───────────────────────────────────────────────── */
+/* ── Models section ───────────────────────────────────────────────────────── */
 .modelsSection {
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   width: 100%;
-}
-
-.modelActions {
-  display: flex;
-  margin-bottom: 0.4rem;
 }
 
 .modelsSection h4 {

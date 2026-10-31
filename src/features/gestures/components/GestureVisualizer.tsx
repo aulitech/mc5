@@ -10,12 +10,13 @@
 // replays (they start together and loop when the longer one ends), and they
 // share one camera, so orbiting either view turns both. Clicking a pane makes
 // it the one the next selected recording, standard gesture or Live fills.
-// "Reset position" puts every pane back at its rest pose and restarts the
+// Pressing Record puts every pane back at its rest pose and restarts the
 // replays together, which also undoes live gyro drift. The turn button in the
 // first pane's corner turns every pane's model about the vertical axis
-// (-22.5°, 0° or 22.5°), to see a gesture a little from the side. The record controls
-// (RecordOverlay) are drawn over the first pane, and a pane that replays has
-// a timeline (PlaybackTimeline) along its bottom that shows and moves that clock.
+// (0°, 22.5°, 0°, -22.5°, …), to see a gesture a little from either side.
+// The record controls (RecordOverlay) are drawn over the first pane, and a
+// pane that replays has a timeline (PlaybackTimeline) along its bottom that
+// shows and moves that clock.
 //
 // One animation loop drives every pane and reads its inputs through refs —
 // React state can't be read inside a requestAnimationFrame closure because
@@ -35,10 +36,6 @@ import { fmtTime } from "../lib/format";
 import { useGestureStore, type ViewSource } from "../state/GestureStoreContext";
 import PlaybackTimeline from "./PlaybackTimeline";
 import styles from "../GestureTab.module.css";
-
-// Three shades of yellow, one per axis — distinct enough to help judge depth
-// while staying within a single color family (no red/green/blue coding).
-const AXIS_COLORS = { X: 0xfff176, Y: 0xffd600, Z: 0xf57f17 }; // pale, medium, deep
 
 // ── Device orientation → rest pose ──────────────────────────────────────────
 //
@@ -100,48 +97,27 @@ function computeOrientationQuaternion(usbCode?: string, ledCode?: string) {
   return new THREE.Quaternion().setFromRotationMatrix(rotation);
 }
 
-// One solid-colored cylinder per axis (thicker/more visible than a thin
-// Line, which WebGL caps at ~1px regardless of `linewidth`).
-function createAxis(direction: THREE.Vector3, colorHex: number, length: number, radius: number) {
-  const dir = direction.clone().normalize();
-  const cylinder = new THREE.Mesh(
-    new THREE.CylinderGeometry(radius, radius, length, 12),
-    new THREE.MeshBasicMaterial({ color: colorHex, depthTest: false }),
-  );
-  cylinder.renderOrder = 998;
-  // CylinderGeometry's axis is +Y by default; rotate it to point along `dir`.
-  cylinder.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-  cylinder.position.copy(dir).multiplyScalar(length / 2);
-  return cylinder;
-}
-
-// Builds a thick-lined XYZ axes indicator (a beefed-up alternative to
-// THREE.AxesHelper, which is thin and capped at ~1px line width).
-function createAxesIndicator(length = 25, radius = 0.4) {
-  const group = new THREE.Group();
-  group.add(createAxis(new THREE.Vector3(1, 0, 0), AXIS_COLORS.X, length, radius));
-  group.add(createAxis(new THREE.Vector3(0, 1, 0), AXIS_COLORS.Y, length, radius));
-  group.add(createAxis(new THREE.Vector3(0, 0, 1), AXIS_COLORS.Z, length, radius));
-  return group;
-}
-
 // IMU samples per second. Replays consume samples at this rate (× speed),
 // and the gyro integration below treats each sample as 1/SAMPLE_RATE_HZ s.
 const SAMPLE_RATE_HZ = 100;
 // Cap on how much time one animation frame may catch up (e.g. after the tab
 // was hidden), so playback resumes rather than fast-forwarding.
 const MAX_FRAME_MS = 100;
+// Replays stop at the end of this many plays through, unless one is compared
+// with Live; ▶ plays them as many times again.
+const MAX_PLAYS = 3;
 // Live samples waiting for the next animation frame are capped (e.g. while
 // the tab is hidden and frames stop); beyond this the oldest are dropped.
 const MAX_LIVE_BACKLOG = SAMPLE_RATE_HZ * 10;
 // Pane edge length: a single pane, or each of the two when comparing.
-const PANE_SIZE = 280;
-const COMPARE_PANE_SIZE = 224;
+const PANE_SIZE = 224;
+const COMPARE_PANE_SIZE = 180;
 // The turn button's steps about the vertical (Y) axis, in degrees, in the
-// order it cycles through them.
-const TURNS = [0, 22.5, -22.5];
-// Where the camera starts, and returns to on "Reset camera view".
-const CAMERA_HOME = new THREE.Vector3(0, 0, 50);
+// order it cycles through them: back to straight on between the two sides.
+const TURNS = [0, 22.5, 0, -22.5];
+// Where the camera starts: close enough that the model fills the panes.
+// Apparent size scales with pane size ÷ distance.
+const CAMERA_HOME = new THREE.Vector3(0, 0, 40);
 
 // The STL is fetched and parsed once per page and shared by every mount.
 let catoGeometry: Promise<THREE.BufferGeometry> | null = null;
@@ -231,7 +207,6 @@ interface PaneScene {
   isReady: () => boolean;
   render: () => void;
   setSize: (size: number) => void;
-  setShowAxes: (show: boolean) => void;
   /** Turn the model (rest pose and motion together) about Y, in degrees. */
   setTurn: (degrees: number) => void;
   dispose: () => void;
@@ -293,8 +268,6 @@ function createPaneScene(mount: HTMLElement, camera: THREE.PerspectiveCamera, ta
   deviceGroup.add(meshGroup);
 
   let disposed = false;
-  let showAxes = false;
-  let axesHelper: THREE.Group | null = null;
   let sharedGeometry: THREE.BufferGeometry | null = null;
   loadCatoGeometry().then(
     (geometry) => {
@@ -303,12 +276,6 @@ function createPaneScene(mount: HTMLElement, camera: THREE.PerspectiveCamera, ta
       const mesh = new THREE.Mesh(geometry, shaderMaterial);
       mesh.scale.set(0.5, 0.5, 0.5);
       meshGroup.add(mesh);
-
-      // No offset relative to meshGroup, so these are the STL file's own
-      // raw axes (no IMU-alignment correction applied).
-      axesHelper = createAxesIndicator(25, 0.4);
-      axesHelper.visible = showAxes;
-      mesh.add(axesHelper);
     },
     (err) => console.error("GestureVisualizer: failed to load cato model.stl", err),
   );
@@ -322,10 +289,6 @@ function createPaneScene(mount: HTMLElement, camera: THREE.PerspectiveCamera, ta
       renderer.render(scene, camera);
     },
     setSize: (size) => renderer.setSize(size, size),
-    setShowAxes: (show) => {
-      showAxes = show;
-      if (axesHelper) axesHelper.visible = show;
-    },
     setTurn: (degrees) => turnGroup.rotation.set(0, THREE.MathUtils.degToRad(degrees), 0),
     dispose: () => {
       disposed = true;
@@ -343,7 +306,6 @@ interface ViewerPaneProps {
   index: number;
   source: ViewSource | null;
   size: number;
-  showAxes: boolean;
   /** Model turn about Y, in degrees. */
   turn: number;
   camera: THREE.PerspectiveCamera;
@@ -362,7 +324,7 @@ interface ViewerPaneProps {
 }
 
 const ViewerPane = ({
-  index, source, size, showAxes, turn, camera, target, register, side, isTarget, onTarget, overlay, timeline, corner,
+  index, source, size, turn, camera, target, register, side, isTarget, onTarget, overlay, timeline, corner,
 }: ViewerPaneProps) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<PaneScene | null>(null);
@@ -384,15 +346,12 @@ const ViewerPane = ({
   }, [size]);
 
   useEffect(() => {
-    paneRef.current?.setShowAxes(showAxes);
-  }, [showAxes]);
-
-  useEffect(() => {
     paneRef.current?.setTurn(turn);
   }, [turn]);
 
   const label = source ? sourceLabel(source) : "empty";
-  const captionClass = `${styles.vizCaption} ${corner ? styles.vizCaptionBesideCorner : ""}`;
+  // The right-hand pane's caption sits at its right edge.
+  const captionClass = `${styles.vizCaption} ${corner ? styles.vizCaptionBesideCorner : ""} ${side === "Right" ? styles.vizCaptionRight : ""}`;
   const emptyMsg = !side
     ? "Select a gesture to visualize, or choose Live to follow Cato in real time."
     : isTarget
@@ -410,9 +369,10 @@ const ViewerPane = ({
           className={`btn-plain ${captionClass}`}
           onClick={onTarget}
           aria-pressed={isTarget}
+          aria-label={`${side} view: ${label}`}
           title="Selected recordings, standard gestures and Live load into the highlighted side"
         >
-          {side}: {label}
+          {label}
         </button>
       ) : (
         source && <span className={captionClass}>{label}</span>
@@ -438,7 +398,7 @@ interface GestureVisualizerProps {
 const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisualizerProps) => {
   const {
     views, compare, setCompare, targetView, setTargetView, toggleLive, slowMotion, setSlowMotion,
-    positionResets, resetPosition,
+    positionResets,
   } = useGestureStore();
   const { data } = useConfig();
   const usbCode = data?.global_info?.orientation?.usb;
@@ -459,15 +419,20 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   // animation loop.
   const [paused, setPaused] = useState(false);
   const speed = slowMotion ? 0.5 : 1;
-  const [showAxes, setShowAxes] = useState(false);
-  const [turn, setTurn] = useState(TURNS[0]);
-  const nextTurn = TURNS[(TURNS.indexOf(turn) + 1) % TURNS.length];
+  const [turnStep, setTurnStep] = useState(0);
+  const turn = TURNS[turnStep];
+  const nextTurnStep = (turnStep + 1) % TURNS.length;
+  const nextTurn = TURNS[nextTurnStep];
+  // Compared with Live, a replay keeps looping (see MAX_PLAYS).
+  const comparingLive = compare && views.some((v) => v?.kind === "live");
   const pausedRef = useRef(paused);
   const speedRef = useRef(speed);
+  const comparingLiveRef = useRef(comparingLive);
   useEffect(() => {
     pausedRef.current = paused;
     speedRef.current = speed;
-  }, [paused, speed]);
+    comparingLiveRef.current = comparingLive;
+  }, [paused, speed, comparingLive]);
 
   // Auto-play whenever a pane gets something new to show (adjusting state on
   // a prop change during render, rather than in an effect).
@@ -482,6 +447,8 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   const restQuatRef = useRef(new THREE.Quaternion());
   /** Replay clock, in samples, shared by every pane. */
   const clockRef = useRef(0);
+  /** Times the replays have played through since they (re)started. */
+  const playsRef = useRef(0);
   /** The timeline's playhead is being dragged: the clock holds still. */
   const scrubbingRef = useRef(false);
   /** Set to put every pane back at its rest pose and restart the clock on the next frame. */
@@ -512,7 +479,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
     liveResetRef.current = true;
   }, [liveIndex]);
 
-  // "Reset position" (⌂, or pressing Record) → every pane back to its rest pose.
+  // Pressing Record → every pane back to its rest pose.
   useEffect(() => {
     needsResetRef.current = true;
   }, [positionResets]);
@@ -551,6 +518,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
 
       if (needsResetRef.current) {
         clockRef.current = 0;
+        playsRef.current = 0;
         for (const pane of panes) if (pane) resetPane(pane);
         liveQueueRef.current = [];
         needsResetRef.current = false;
@@ -565,17 +533,25 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
       // One clock for every replay, so compared gestures stay in step. It
       // counts samples (SAMPLE_RATE_HZ × speed per second, so 1× is real
       // time on any display refresh rate), waits until every replaying pane
-      // has its model, and loops once the longest replay has finished.
+      // has its model, and loops once the longest replay has finished, up to
+      // MAX_PLAYS times; then it stops on the last pose.
       const loopLength = Math.max(0, ...playbacks.map((pb) => pb?.samples.length ?? 0));
       const ready = playbacks.every((pb, i) => !pb || panes[i]?.isReady());
       if (loopLength > 0 && ready && !pausedRef.current && !scrubbingRef.current) {
         clockRef.current += (elapsed / 1000) * SAMPLE_RATE_HZ * speedRef.current;
         if (clockRef.current >= loopLength) {
-          clockRef.current = 0;
-          playbacks.forEach((pb, i) => {
-            const pane = panes[i];
-            if (pb && pane) resetPane(pane);
-          });
+          playsRef.current += 1;
+          if (playsRef.current >= MAX_PLAYS && !comparingLiveRef.current) {
+            clockRef.current = loopLength;
+            pausedRef.current = true; // before the next frame, not after the re-render
+            setPaused(true);
+          } else {
+            clockRef.current = 0;
+            playbacks.forEach((pb, i) => {
+              const pane = panes[i];
+              if (pb && pane) resetPane(pane);
+            });
+          }
         }
       }
 
@@ -611,14 +587,16 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  const handleResetView = () => {
-    camera.position.copy(CAMERA_HOME);
-    camera.zoom = 1;
-    camera.updateProjectionMatrix();
-    target.set(0, 0, 0);
-  };
-
   const hasReplay = visible.some((v) => v && v.kind !== "live");
+  // ▶ plays MAX_PLAYS more times; stopped at the end, it starts them over.
+  const handlePlayPause = () => {
+    if (paused) {
+      const loopLength = Math.max(0, ...visible.map((v) => (v && v.kind !== "live" ? v.samples.length : 0)));
+      if (clockRef.current >= loopLength) needsResetRef.current = true;
+      else playsRef.current = 0;
+    }
+    setPaused(!paused);
+  };
   const handleSeek = useCallback((samples: number) => {
     clockRef.current = samples;
   }, []);
@@ -645,7 +623,6 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
             index={i}
             source={source}
             size={size}
-            showAxes={showAxes}
             turn={turn}
             camera={camera}
             target={target}
@@ -659,7 +636,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
                 <button
                   className={styles.vizTurnBtn}
                   onPointerDown={(e) => e.stopPropagation()} // not a click on the pane (Compare's targeting)
-                  onClick={() => setTurn(nextTurn)}
+                  onClick={() => setTurnStep(nextTurnStep)}
                   title={`Model turned ${turn}° about the vertical axis. Click for ${nextTurn}°`}
                   aria-label={`Turn the model to ${nextTurn}° (now ${turn}°)`}
                 >
@@ -687,15 +664,15 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
         {hasReplay && (
           <>
             <button
-              className={styles.vizBtn}
-              onClick={() => setPaused(!paused)}
+              className={styles.btn}
+              onClick={handlePlayPause}
               title={paused ? "Play" : "Pause"}
               aria-label={paused ? "Play" : "Pause"}
             >
               {paused ? "▶" : "⏸"}
             </button>
             <button
-              className={`${styles.vizBtn} ${slowMotion ? styles.vizBtnActive : ""}`}
+              className={`${styles.btn} ${slowMotion ? "active" : ""}`}
               onClick={() => setSlowMotion(!slowMotion)}
               title={slowMotion ? "Normal speed" : "Slow motion"}
               aria-pressed={slowMotion}
@@ -705,7 +682,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
           </>
         )}
         <button
-          className={`${styles.vizBtn} ${targetIsLive ? styles.vizBtnActive : ""}`}
+          className={`${styles.btn} ${targetIsLive ? "active" : ""}`}
           onClick={toggleLive}
           disabled={isRecording}
           title={liveTitle}
@@ -714,23 +691,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
           Live
         </button>
         <button
-          className={styles.vizBtn}
-          onClick={resetPosition}
-          title="Reset position"
-          aria-label="Reset position"
-        >
-          ⌂
-        </button>
-        <button
-          className={styles.vizBtn}
-          onClick={handleResetView}
-          title="Reset camera view"
-          aria-label="Reset camera view"
-        >
-          ⟲
-        </button>
-        <button
-          className={`${styles.vizBtn} ${compare ? styles.vizBtnActive : ""}`}
+          className={`${styles.btn} ${compare ? "active" : ""}`}
           onClick={() => setCompare(!compare)}
           disabled={isRecording}
           title={compare ? "Show one view" : "Show two views side by side, in sync"}
@@ -738,14 +699,6 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
         >
           Compare
         </button>
-        <label className={styles.checkLabel} title="Show the STL file's own raw X/Y/Z axes, unadjusted for the IMU's orientation">
-          <input
-            type="checkbox"
-            checked={showAxes}
-            onChange={(e) => setShowAxes(e.target.checked)}
-          />
-          Show axes
-        </label>
       </div>
     </div>
   );
