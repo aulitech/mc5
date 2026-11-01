@@ -76,8 +76,15 @@ function YTicks({ x, panelTop, panelH, min, max }: { x: number; panelTop: number
   );
 }
 
-export default function GestureTemplateChart({ template, gestureName }: { template: Template; gestureName: string }) {
-  const plotW = CHART_W - MARGIN.left - MARGIN.right;
+interface GestureTemplateChartProps {
+  template: Template;
+  gestureName: string;
+  /** Overall width in px (narrower in the gestures list); the height is fixed. */
+  width?: number;
+}
+
+export default function GestureTemplateChart({ template, gestureName, width = CHART_W }: GestureTemplateChartProps) {
+  const plotW = width - MARGIN.left - MARGIN.right;
 
   const gyroTop = MARGIN.top;
   const accTop  = MARGIN.top + PANEL_H + GAP;
@@ -93,9 +100,9 @@ export default function GestureTemplateChart({ template, gestureName }: { templa
 
   return (
     <div>
-      <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.8rem", fontWeight: 600 }}>{gestureName}</p>
+      <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.8rem", fontWeight: 600 }}>{gestureName} template</p>
       <svg
-        width={CHART_W}
+        width={width}
         height={CHART_H}
         style={{ fontFamily: "sans-serif", display: "block" }}
         role="img"
@@ -140,7 +147,7 @@ export default function GestureTemplateChart({ template, gestureName }: { templa
         ))}
 
         {/* X-axis label */}
-        <text x={CHART_W / 2} y={CHART_H - 2} textAnchor="middle" fontSize={9} fill={TEXT_FILL}>
+        <text x={width / 2} y={CHART_H - 2} textAnchor="middle" fontSize={9} fill={TEXT_FILL}>
           Sample (0–99)
         </text>
 

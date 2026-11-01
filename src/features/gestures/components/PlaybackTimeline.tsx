@@ -40,13 +40,16 @@ const PlaybackTimeline = ({ length, sampleRate, clockRef, onSeek, onScrub }: Pla
       animId = requestAnimationFrame(follow);
       const clock = Math.min(Math.max(clockRef.current, 0), length);
       const ms = toMs(clock, sampleRate);
-      if (ms === shownMs) return;
+      // Gone if a frame comes between unmounting and this effect's cleanup.
+      const head = headRef.current;
+      const readout = readoutRef.current;
+      if (ms === shownMs || !head || !readout) return;
       shownMs = ms;
-      headRef.current!.style.left = `${(clock / length) * 100}%`;
-      headRef.current!.setAttribute("aria-valuenow", String(ms));
+      head.style.left = `${(clock / length) * 100}%`;
+      head.setAttribute("aria-valuenow", String(ms));
       const seconds = (ms / 1000).toFixed(3);
-      headRef.current!.setAttribute("aria-valuetext", `${seconds} seconds`);
-      readoutRef.current!.textContent = seconds;
+      head.setAttribute("aria-valuetext", `${seconds} seconds`);
+      readout.textContent = seconds;
     };
     animId = requestAnimationFrame(follow);
     return () => cancelAnimationFrame(animId);

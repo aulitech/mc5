@@ -1,7 +1,7 @@
 // gestureDB.ts — IndexedDB wrapper for gesture data storage.
 //
 // Think of this file as the "filing cabinet" for the app. Every time you save
-// a gesture recording or generate a template, this module handles putting it
+// a gesture recording or choose the model's gestures, this module handles putting it
 // in the right drawer and retrieving it later. No other component needs to
 // know how IndexedDB works — they just call these functions.
 //
@@ -9,15 +9,21 @@
 // refreshes and requires no internet connection. It's asynchronous, meaning
 // every read/write returns a Promise that you must await.
 
-import type { GestureModel, ModelGesture, Recording, Sample } from "../../../types/gestures";
+import type { ModelSlot, Recording, Sample } from "../../../types/gestures";
 
 const DB_NAME = "gestureDB";
 const DB_VERSION = 2;
 const STORE_RECORDINGS = "gesture_data";
+// Named models saved by MyCato before 1.2.4. Nothing reads it now; it stays
+// in the schema so the database version doesn't change.
 const STORE_MODELS = "gesture_models";
-// Small settings, by key (v2): e.g. the order of the saved gestures list.
+// Small settings, by key (v2): the order of the gestures list, the model's
+// slots, the Cato drive the model is installed on.
 const STORE_META = "meta";
 const GESTURE_ORDER_KEY = "gestureOrder";
+const MODEL_SLOTS_KEY = "modelSlots";
+const SLOTS_FROM_DEVICE_KEY = "modelSlotsFromDevice";
+const CATO_DRIVE_KEY = "catoDrive";
 
 // Opens (or creates) the database, returning a Promise<IDBDatabase>.
 // This is called automatically by every exported function — you never need
@@ -215,7 +221,7 @@ export async function getGestureCounts(): Promise<Record<string, number>> {
   return Object.fromEntries(classes.map((c) => [c.name, c.count]));
 }
 
-/** The user's saved order of gesture classes ([] until they reorder). */
+/** The personal gestures list, in order ([] if never saved). See lib/gestureOrder. */
 export async function getGestureOrder(): Promise<string[]> {
   const db = await openDB();
   const tx = db.transaction(STORE_META, "readonly");
@@ -228,6 +234,34 @@ export async function saveGestureOrder(names: string[]): Promise<void> {
   const tx = db.transaction(STORE_META, "readwrite");
   tx.objectStore(STORE_META).put(names, GESTURE_ORDER_KEY);
   await txDone(tx);
+}
+
+/** The model's gesture slots, as last saved ([] until set). Not checked
+ * against the gestures that exist — see lib/modelSlots validSlots. */
+export async function getModelSlots(): Promise<unknown> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_META, "readonly");
+  return (await promisify(tx.objectStore(STORE_META).get(MODEL_SLOTS_KEY))) ?? [];
+}
+
+/**
+ * Save the model's slots. `fromDevice` is the device gesture list they were
+ * set from, when they were: kept so that list fills them only once.
+ */
+export async function saveModelSlots(slots: ModelSlot[], fromDevice?: string[]): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_META, "readwrite");
+  tx.objectStore(STORE_META).put(slots, MODEL_SLOTS_KEY);
+  if (fromDevice) tx.objectStore(STORE_META).put(fromDevice, SLOTS_FROM_DEVICE_KEY);
+  await txDone(tx);
+}
+
+/** The device gesture list the slots were last set from ([] if never). */
+export async function getSlotsFromDevice(): Promise<string[]> {
+  const db = await openDB();
+  const tx = db.transaction(STORE_META, "readonly");
+  const value: unknown = await promisify(tx.objectStore(STORE_META).get(SLOTS_FROM_DEVICE_KEY));
+  return Array.isArray(value) ? value.filter((n): n is string => typeof n === "string") : [];
 }
 
 /**
@@ -258,47 +292,17 @@ export async function deleteRecording(id: number): Promise<void> {
   await txDone(tx);
 }
 
-// ─── Models (templates) ────────────────────────────────────────────────────────
-
-/**
- * Save a generated gesture template model.
- * @param modelName - User-provided name
- * @param templates - { [gestureName]: { template, keptCount, totalCount } }
- * @returns The saved model, including its auto-assigned ID
- */
-export async function saveModel(
-  modelName: string,
-  templates: Record<string, ModelGesture>,
-): Promise<GestureModel> {
+/** The Cato drive chosen for installing models, if one has been (see catoDrive.ts). */
+export async function getCatoDrive(): Promise<FileSystemDirectoryHandle | null> {
   const db = await openDB();
-  const tx = db.transaction(STORE_MODELS, "readwrite");
-  const store = tx.objectStore(STORE_MODELS);
-  const record = {
-    modelName,
-    createdAt: new Date().toISOString(),
-    templates,
-  };
-  const done = txDone(tx);
-  const id = (await promisify(store.add(record))) as number;
-  await done;
-  return { id, ...record };
+  const tx = db.transaction(STORE_META, "readonly");
+  const value: unknown = await promisify(tx.objectStore(STORE_META).get(CATO_DRIVE_KEY));
+  return typeof FileSystemDirectoryHandle !== "undefined" && value instanceof FileSystemDirectoryHandle ? value : null;
 }
 
-/**
- * Fetch all stored gesture models.
- */
-export async function getAllModels(): Promise<GestureModel[]> {
+export async function saveCatoDrive(drive: FileSystemDirectoryHandle): Promise<void> {
   const db = await openDB();
-  const tx = db.transaction(STORE_MODELS, "readonly");
-  return promisify(tx.objectStore(STORE_MODELS).getAll());
-}
-
-/**
- * Delete a stored model by its auto-assigned ID.
- */
-export async function deleteModel(id: number): Promise<void> {
-  const db = await openDB();
-  const tx = db.transaction(STORE_MODELS, "readwrite");
-  tx.objectStore(STORE_MODELS).delete(id);
+  const tx = db.transaction(STORE_META, "readwrite");
+  tx.objectStore(STORE_META).put(drive, CATO_DRIVE_KEY);
   await txDone(tx);
 }

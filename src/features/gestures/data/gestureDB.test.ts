@@ -4,17 +4,17 @@ import type { Sample } from "../../../types/gestures";
 import {
   addRecordings,
   deleteGesture,
-  deleteModel,
   deleteRecording,
-  getAllModels,
   getAllRecordings,
   getGestureClasses,
   getGestureOrder,
   getGestureCounts,
+  getModelSlots,
+  getSlotsFromDevice,
   getRecordingsForGesture,
   renameGesture,
   saveGestureOrder,
-  saveModel,
+  saveModelSlots,
   saveRecording,
 } from "./gestureDB";
 
@@ -78,11 +78,12 @@ describe("gestureDB", () => {
     expect((await getGestureCounts())["del"]).toBeUndefined();
   });
 
-  it("saves, lists and deletes models", async () => {
-    const template = { acc_x: [1], acc_y: [1], acc_z: [1], gyro_x: [1], gyro_y: [1], gyro_z: [1] };
-    const model = await saveModel("m", { nod: { template, keptCount: 1, totalCount: 1 } });
-    expect((await getAllModels()).map((m) => m.id)).toContain(model.id);
-    await deleteModel(model.id);
-    expect((await getAllModels()).map((m) => m.id)).not.toContain(model.id);
+  it("saves the model's slots", async () => {
+    expect(await getModelSlots()).toEqual([]);
+    await saveModelSlots([{ kind: "personal", name: "nod" }, { kind: "pretrained", id: "tilt_left" }]);
+    expect(await getModelSlots()).toEqual([{ kind: "personal", name: "nod" }, { kind: "pretrained", id: "tilt_left" }]);
+    expect(await getSlotsFromDevice()).toEqual([]);
+    await saveModelSlots([], ["Idle", "Movement"]);
+    expect(await getSlotsFromDevice()).toEqual(["Idle", "Movement"]);
   });
 });

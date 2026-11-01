@@ -52,6 +52,11 @@
   gap: 0.4rem;
 }
 
+/* "+ Gesture" and "+ Model", under their lists: only as wide as their text. */
+.addBtn {
+  align-self: flex-start;
+}
+
 /* btn-primary has no disabled look of its own. */
 .addBtn:disabled,
 .addBtn:disabled:hover {
@@ -80,15 +85,6 @@
   gap: 0.75rem;
   min-width: 220px;
   max-width: 260px;
-}
-
-.rightPanel {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  flex: 1;
-  align-items: flex-start;
-  margin-left: 6rem;
 }
 
 /* Column 2: just the visualizer, sized to its own fixed content */
@@ -211,34 +207,6 @@
   margin-left: auto;
 }
 
-/* Drag handle at the start of a saved gesture row. */
-.dragHandle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: 1rem;
-  color: var(--color-muted);
-  cursor: grab;
-}
-
-.dragHandle:active {
-  cursor: grabbing;
-}
-
-/* The row being dragged, and where it will land (a line above or below a row). */
-.dragging {
-  opacity: 0.5;
-}
-
-.dropBefore {
-  box-shadow: 0 -2px 0 0 var(--primary);
-}
-
-.dropAfter {
-  box-shadow: 0 2px 0 0 var(--primary);
-}
-
 /* Shows/hides a class's recordings; points down when open. */
 .disclosure {
   display: inline-flex;
@@ -272,19 +240,6 @@
   padding: 0 0.4rem;
 }
 
-/* ── Standard gestures (built-in nod/tilt templates) ──────────────────────── */
-.standardDivider {
-  border-top: 1px solid var(--border);
-  margin: 0.5rem 0;
-}
-
-.standardGesturesHeading {
-  margin: 0;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--color-muted);
-}
-
 /* Import / Export recordings, under the lists. */
 .recordingFileActions {
   display: flex;
@@ -294,22 +249,6 @@
 .recordingFileActions > button {
   flex: 1;
   justify-content: center;
-}
-
-/* Built-in gestures are a fixed reference list: packed tighter than the
-   saved gestures above. */
-.standardList {
-  gap: 0;
-}
-
-.standardList .summaryItem {
-  padding-block: 0.15rem;
-}
-
-.standardList .templateCheckbox {
-  width: 1rem;
-  height: 1rem;
-  margin: 0;
 }
 
 /* ── Visualizer ───────────────────────────────────────────────────────────── */
@@ -323,6 +262,18 @@
 .vizPanes {
   display: flex;
   gap: 0.5rem;
+}
+
+/* A pane with its template graph (ViewTemplate) under it. */
+.vizColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.viewTemplate .emptyMsg {
+  margin: 0;
+  font-size: 0.75rem;
 }
 
 /* ── Playback timeline (PlaybackTimeline) ─────────────────────────────────── */
@@ -432,35 +383,32 @@
 }
 
 /* Text drawn straight on the dark viewer panel (e.g. the empty-state hint). */
-.visualizerWrap > .emptyMsg {
-  color: var(--viz-color);
-  text-align: center;
-  padding: 0 2rem;
-}
-
-/* What the pane shows; when comparing, also the button that targets it. */
-.vizCaption {
+/* What the pane shows (ViewPicker): a compact dropdown in its top corner,
+   clear of the turn button. */
+.vizPicker {
   position: absolute;
-  top: 0.4rem;
-  left: 0.5rem;
-  right: 0.5rem;
+  top: 0.35rem;
+  left: 0.4rem;
   z-index: 1;
+  max-width: calc(100% - 2.8rem);
+  padding: 0.1rem 0.2rem;
+  font: inherit;
   font-size: 0.75rem;
-  text-align: left;
   color: var(--viz-color);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  background: var(--viz-bg);
+  border: 1px solid var(--viz-color);
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.vizCaptionRight {
-  text-align: right;
-  justify-content: flex-end; /* the caption button lays its text out as flex */
+.vizPicker:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
-/* Leaves room for the turn button in the pane's corner. */
-.vizCaptionBesideCorner {
-  right: 2.2rem;
+.vizPickerRight {
+  left: auto;
+  right: 0.4rem;
 }
 
 /* Turns the model about Y (-22.5°, 0°, 22.5°) in every pane. */
@@ -568,121 +516,49 @@
   padding: 0.2rem 0.4rem;
 }
 
-/* ── Template chart ───────────────────────────────────────────────────────── */
-.chartWrap {
-  width: fit-content;
-}
+/* ── Model section: the gesture slots, and their template graphs ──────────── */
 
-/* ── Template stats ───────────────────────────────────────────────────────── */
-.templateStats {
-  font-size: 0.78rem;
-  color: var(--color-muted);
-  margin: 0;
-}
 
-/* ── Template actions ─────────────────────────────────────────────────────── */
-.templateActions {
-  display: flex;
-  flex-direction: row;
-  gap: 0.5rem;
-}
 
-/* ── Models section ───────────────────────────────────────────────────────── */
-.modelsSection {
+
+.modelSection {
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
-  width: 100%;
+  gap: 0.75rem;
+  width: 260px;
 }
 
-.modelsSection h4 {
-  margin: 0;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-
-.modelList {
+.modelSlots {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
+  gap: 0.35rem;
 }
 
-.modelCard {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  padding: 0.5rem;
-  border-radius: 4px;
-  border: 1px solid transparent;
-}
-
-.modelCard:hover {
-  background: var(--bg-hover);
-}
-
-.modelCardSelected {
-  border-color: var(--primary);
-  background: var(--bg-selected);
-}
-
-/* ── Model template charts (right panel) ──────────────────────────────────── */
-.modelCharts {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  width: 100%;
-}
-
-.modelChartsTitle {
-  margin: 0 0 0.75rem 0;
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-/* ▶ name … install, delete — always on one line; a long name is cut short. */
-.modelCardHeader {
+.modelSlot {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.5rem;
 }
 
-.modelName {
+.modelSlotNumber {
+  width: 1rem;
+  text-align: right;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.modelSlotSelect {
   flex: 1;
   min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  text-align: left;
-  font-weight: 600;
-  font-size: 0.85rem;
 }
 
-.modelGestureList {
-  list-style: none;
-  margin: 0;
-  padding: 0 0 0 1.55rem; /* under the name, past the disclosure triangle */
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-}
-
-.modelGestureItem {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.78rem;
-  color: var(--color);
-}
-
-/* ── Template generation checkbox ─────────────────────────────────────────── */
-.templateCheckbox {
-  flex-shrink: 0;
-  cursor: pointer;
-  accent-color: var(--primary);
-  width: 1.2rem;
-  height: 1.2rem;
+.modelSlotSelect:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 /* ── Misc ─────────────────────────────────────────────────────────────────── */
@@ -697,6 +573,7 @@
   display: flex;
   flex-direction: column;
 }
+
 
 .recordingList {
   list-style: none;
