@@ -100,7 +100,6 @@ export default function GestureTemplateChart({ template, gestureName, width = CH
 
   return (
     <div>
-      <p style={{ margin: "0 0 0.25rem 0", fontSize: "0.8rem", fontWeight: 600 }}>{gestureName} template</p>
       <svg
         width={width}
         height={CHART_H}

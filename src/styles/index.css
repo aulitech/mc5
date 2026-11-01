@@ -184,6 +184,9 @@
   /* Status colours on the (always dark) viewer: the dark-theme ones */
   --viz-danger: var(--dark-danger);
   --viz-success: var(--dark-success);
+  /* A viewer control that's on: the blue of the light theme's + buttons. */
+  --viz-active-bg: var(--light-primary);
+  --viz-active-color: var(--light-color-on-primary);
   /* Template chart X / Y / Z lines (Okabe–Ito hues, shaded per theme). */
   --chart-1: light-dark(#005a8c, #56b4e9);
   --chart-2: light-dark(#8a4a00, #e69f00);

@@ -61,6 +61,12 @@ summary:focus-visible {
   outline-offset: 2px;
 }
 
+/* The page around the viewer while a gesture is being recorded (usePageLock):
+   inert, so dimmed to look it. */
+.page-locked {
+  opacity: 0.35;
+}
+
 .btn-danger:hover {
   background: color-mix(in srgb, var(--danger) 20%, transparent);
   color: var(--danger);
