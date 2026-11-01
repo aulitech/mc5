@@ -28,6 +28,7 @@ import {
   parseSensor,
   parseStatus,
   responseText,
+  type ResponseState,
 } from "./protocol";
 
 const FILTERS = [{ vendorId: 0x1915, productId: 0x52dd }];
@@ -185,17 +186,47 @@ function onHidDisconnect(event: HIDConnectionEvent) {
 
 // ── Commands ──────────────────────────────────────────────────────────────────
 
-async function receiveResponse(d: HIDDevice): Promise<unknown> {
+// A response being read, kept across reads so a retry can carry on where the
+// last one stopped instead of starting the message over.
+interface PendingResponse {
+  state: ResponseState;
+}
+
+// A read abandoned at its deadline still finishes, and the report it brings
+// back is the next piece of the response. The next read waits for that one
+// instead of asking for another, so the piece isn't lost.
+let inflightRead: Promise<DataView> | null = null;
+
+function readReport(d: HIDDevice, deadline: number): Promise<DataView> {
+  if (!inflightRead) {
+    const started = d.receiveFeatureReport(OTA_FR.id);
+    inflightRead = started;
+    started.catch(() => {
+      if (inflightRead === started) inflightRead = null;
+    });
+  }
+  const read = inflightRead;
+  return withDeadline(read, deadline).then((dv) => {
+    if (inflightRead === read) inflightRead = null;
+    return dv;
+  });
+}
+
+async function receiveResponse(
+  d: HIDDevice,
+  response: PendingResponse = { state: initialResponseState() },
+): Promise<unknown> {
   if (!d.opened) throw new Error("Device not opened");
 
   const deadline = Date.now() + RESPONSE_TIMEOUT_MS;
-  let state = initialResponseState();
-  while (state.remaining > 0) {
-    const dv = await withDeadline(d.receiveFeatureReport(OTA_FR.id), deadline).catch((err) => {
+  while (response.state.remaining > 0) {
+    const dv = await readReport(d, deadline).catch((err) => {
       throw new Error(`Error receiving feature report: ${String(err)}`);
     });
-    state = applyResponseChunk(state, dv);
+    response.state = applyResponseChunk(response.state, dv);
   }
+  const state = response.state;
+  response.state = initialResponseState();
 
   if (state.error) {
     if (isMissingNode(state.error)) {
@@ -226,6 +257,17 @@ function withDeadline<T>(promise: Promise<T>, deadline: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
+async function sendPackets(d: HIDDevice, command: string) {
+  console.log("OTA Sending: ", command);
+  for (const packet of encodeCommand(command)) {
+    try {
+      await d.sendFeatureReport(OTA_FR.id, packet);
+    } catch (e) {
+      throw new Error(`Error sending feature report: ${String(e)}`);
+    }
+  }
+}
+
 async function sendNow(command: string): Promise<unknown> {
   const d = device;
   if (!d) throw new Error("No connected device");
@@ -239,15 +281,7 @@ async function sendNow(command: string): Promise<unknown> {
     lastSensorReportAt = 0;
   }
 
-  console.log("OTA Sending: ", command);
-  for (const packet of encodeCommand(command)) {
-    try {
-      await d.sendFeatureReport(OTA_FR.id, packet);
-    } catch (e) {
-      throw new Error(`Error sending feature report: ${String(e)}`);
-    }
-  }
-
+  await sendPackets(d, command);
   const res = await receiveResponse(d).catch((err) => {
     throw new Error(`Error processing feature report: ${String(err)}`);
   });
@@ -257,40 +291,41 @@ async function sendNow(command: string): Promise<unknown> {
 
 let queue: Promise<unknown> = Promise.resolve();
 
+/** Run a job after every job queued before it. */
+function enqueue<T>(job: () => Promise<T>): Promise<T> {
+  const result = queue.then(job);
+  queue = result.catch(() => undefined);
+  return result;
+}
+
 /**
  * Send a text command and resolve with the device's (JSON-parsed) response.
  * Calls are serialized — a send issued while another is in flight waits for
  * it rather than failing.
  */
 export function send<T = unknown>(command: string): Promise<T> {
-  const result = queue.then(() => sendNow(command));
-  queue = result.catch(() => undefined);
-  return result as Promise<T>;
+  return enqueue(() => sendNow(command)) as Promise<T>;
 }
 
 // ── Connect / disconnect ──────────────────────────────────────────────────────
 
-async function initialize(d: HIDDevice): Promise<DeviceInfo> {
-  let result: Partial<DeviceInfo> | null = null;
-  try {
-    result = await send<DeviceInfo>("init");
-  } catch (e) {
-    console.error("Error during device initialization: ", String(e));
-    await delay(500);
-  }
+// "init" plus the retries after it.
+const INIT_ATTEMPTS = 16;
 
-  // Recovery: if "init" failed, the response may still be pending — keep
-  // reading feature reports for a while before giving up.
-  let retry = 0;
-  while (!result?.version && retry < 15) {
+async function initialize(d: HIDDevice): Promise<DeviceInfo> {
+  const response: PendingResponse = { state: initialResponseState() };
+  let result: Partial<DeviceInfo> | null = null;
+  for (let attempt = 1; attempt <= INIT_ATTEMPTS && !result?.version; attempt++) {
     try {
-      result = (await receiveResponse(d)) as Partial<DeviceInfo>;
+      // Asked once only: asking again makes Cato answer twice, and the spare
+      // answer would then be read as the next command's.
+      if (attempt === 1) await sendPackets(d, "init");
+      result = (await receiveResponse(d, response)) as Partial<DeviceInfo>;
+      console.log(`Initialization attempt (${attempt})`, result);
     } catch (e) {
-      console.error("Error during initialization recovery: ", String(e));
+      console.error(`Initialization attempt (${attempt}) failed: `, String(e));
       await delay(500);
     }
-    retry += 1;
-    console.log(`Initialization attempt (${retry})`, result);
   }
 
   if (!result?.version) {
@@ -315,7 +350,7 @@ export async function connect(): Promise<CatoDevice | null> {
     navigator.hid.addEventListener("disconnect", onHidDisconnect);
     selected.addEventListener("inputreport", onInputReport);
 
-    info = await initialize(selected);
+    info = await enqueue(() => initialize(selected));
     practiceDecoder.reset();
 
     const connected: CatoDevice = { productName: selected.productName, info };
@@ -338,9 +373,30 @@ export interface ReadConfigResult {
   unreadProfile?: number;
 }
 
+// Cato's answers don't say which command they're for. One left over from
+// start-up (Cato can answer "init" twice) is read as global_info's, so check
+// it is one: these fields are always there.
+const isGlobalInfo = (answer: unknown): answer is GlobalInfo =>
+  typeof answer === "object" && answer !== null && "action_list" in answer && "profile_map" in answer;
+
+async function readGlobalInfo(): Promise<GlobalInfo> {
+  let answer = await send("config get /global_info");
+  for (let tries = 0; !isGlobalInfo(answer) && tries < 3; tries++) {
+    console.warn("[ota] expected global_info, skipping this answer: ", answer);
+    // The real answer is queued behind the spare one; failing that, ask again.
+    answer = await enqueue(() => {
+      const d = device;
+      if (!d) throw new Error("No connected device");
+      return receiveResponse(d);
+    }).catch(() => send("config get /global_info"));
+  }
+  if (!isGlobalInfo(answer)) throw new Error("Cato didn't send its global settings. Reconnect and try again.");
+  return answer;
+}
+
 /** Read global_info and every profile from the connected device. */
 export async function readConfig(): Promise<ReadConfigResult> {
-  const global_info = await send<GlobalInfo>("config get /global_info");
+  const global_info = await readGlobalInfo();
   const profiles: Profile[] = [];
   for (let i = 0; i < MAX_PROFILES; i++) {
     const read = () => send<Profile>(`config get /profiles/${i}`);
@@ -364,6 +420,7 @@ export async function close(): Promise<void> {
   if (!d) return;
   device = null;
   info = null;
+  inflightRead = null;
   navigator.hid.removeEventListener("disconnect", onHidDisconnect);
   d.removeEventListener("inputreport", onInputReport);
 

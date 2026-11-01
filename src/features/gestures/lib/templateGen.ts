@@ -261,18 +261,26 @@ export function buildTemplateWithOutlierRejection(
 }
 
 /**
- * Build the device's model archive (xcorr_model.zip): model_params.csv plus
- * one CSV per gesture class, each holding its template as t (0-99) rows of
- * acc_x, acc_y, acc_z, gyro_x, gyro_y, gyro_z.
- *
- * @param templates - Output of buildTemplate() per class
+ * A gesture's template from its raw recordings: each is preprocessed (those
+ * without the whole gesture in the window are dropped), then averaged with
+ * outlier rejection.
  */
-export async function buildTemplatesZip(templates: Record<string, Template>): Promise<Blob> {
-  const { default: JSZip } = await import("jszip");
-  const zip = new JSZip();
-  const cols = TEMPLATE_CHANNELS;
+export function buildGestureTemplate(recordings: Sample[][]) {
+  const preprocessed = recordings.map(preprocessRecording).filter((r): r is Sample[] => r !== null);
+  return buildTemplateWithOutlierRejection(preprocessed);
+}
 
-  const gestureNames = Object.keys(templates || {});
+/**
+ * The device's model files: model_params.csv plus one CSV per gesture class,
+ * each holding its template as t (0-99) rows of acc_x, acc_y, acc_z, gyro_x,
+ * gyro_y, gyro_z. They go in Cato's xcorr_model folder (and xcorr_model.zip).
+ *
+ * @param templates - [class name, template] per class, in the model's order
+ * @returns [file name, contents] per file
+ */
+export function buildModelFiles(templates: [string, Template][]): [string, string][] {
+  const cols = TEMPLATE_CHANNELS;
+  const gestureNames = templates.map(([name]) => name);
 
   // model_params.csv: first row is space-separated numerical metadata,
   // remaining rows are gesture class names (one per line). The device-side
@@ -287,16 +295,24 @@ export async function buildTemplatesZip(templates: Record<string, Template>): Pr
     [gestureNames.length, WIN, cols.length, "10.0"].join(" "),
     ...safeGestureNames,
   ];
-  zip.file("model_params.csv", paramsLines.join("\n"));
+  const files: [string, string][] = [["model_params.csv", paramsLines.join("\n")]];
 
-  Object.values(templates || {}).forEach((template, i) => {
+  templates.forEach(([, template], i) => {
     const n = template[cols[0]]?.length ?? 0;
     const values: (number | string)[] = [];
     for (let t = 0; t < n; t++) {
       for (const c of cols) values.push(template[c][t] ?? "");
     }
-    zip.file(`model_templates_${i}.csv`, values.join(" "));
+    files.push([`model_templates_${i}.csv`, values.join(" ")]);
   });
 
+  return files;
+}
+
+/** The model files (buildModelFiles) as the device's archive, xcorr_model.zip. */
+export async function buildModelZip(files: [string, string][]): Promise<Blob> {
+  const { default: JSZip } = await import("jszip");
+  const zip = new JSZip();
+  for (const [name, contents] of files) zip.file(name, contents);
   return zip.generateAsync({ type: "blob" });
 }

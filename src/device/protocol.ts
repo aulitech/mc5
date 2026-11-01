@@ -111,7 +111,10 @@ export function applyResponseChunk(state: ResponseState, dv: DataView): Response
 
   const next: ResponseState = { ...state, remaining: 0 };
   switch (msgType) {
-    case MSG.FIRST:
+    case MSG.FIRST: // starts a response, so anything before it is dropped
+      next.remaining = Math.max(0, reportLength - chunk.length);
+      next.bytes = chunk;
+      break;
     case MSG.MID:
       next.remaining = Math.max(0, reportLength - chunk.length);
       next.bytes = concatBytes(state.bytes, chunk);

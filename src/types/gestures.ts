@@ -28,15 +28,6 @@ export interface Recording {
   data: Sample[];
 }
 
-export interface ModelGesture {
-  template: Template;
-  keptCount: number;
-  totalCount: number;
-}
-
-export interface GestureModel {
-  id: number;
-  modelName: string;
-  createdAt: string;
-  templates: Record<string, ModelGesture>;
-}
+/** One gesture slot of the model: a personal (recorded) gesture by name, or a
+ * pretrained (standard) one by id. */
+export type ModelSlot = { kind: "personal"; name: string } | { kind: "pretrained"; id: string };

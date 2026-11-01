@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveTo, orderGestures, renameIn } from "./gestureOrder";
+import { orderGestures, renameIn } from "./gestureOrder";
 
 const classes = [
   { name: "Apple", firstId: 30 },
@@ -12,19 +12,12 @@ describe("gesture order", () => {
     expect(orderGestures([], classes)).toEqual(["Zebra", "Mango", "Apple"]);
   });
 
-  it("keeps the saved order, dropping deleted classes and adding new ones at the end", () => {
-    expect(orderGestures(["Apple", "Gone", "Zebra"], classes)).toEqual(["Apple", "Zebra", "Mango"]);
+  it("keeps the saved list, with gestures that have no recordings, adding new classes at the end", () => {
+    expect(orderGestures(["Apple", "Empty", "Zebra"], classes)).toEqual(["Apple", "Empty", "Zebra", "Mango"]);
   });
 
   it("ignores repeats in a saved order", () => {
     expect(orderGestures(["Mango", "Mango"], classes)).toEqual(["Mango", "Zebra", "Apple"]);
-  });
-
-  it("moves a name to a position", () => {
-    expect(moveTo(["a", "b", "c", "d"], "a", 2)).toEqual(["b", "c", "a", "d"]);
-    expect(moveTo(["a", "b", "c", "d"], "d", 0)).toEqual(["d", "a", "b", "c"]);
-    expect(moveTo(["a", "b"], "b", 9)).toEqual(["a", "b"]);
-    expect(moveTo(["a", "b"], "x", 0)).toEqual(["a", "b"]);
   });
 
   it("renames in place, or drops the old name when merging", () => {

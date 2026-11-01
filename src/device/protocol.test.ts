@@ -107,6 +107,13 @@ describe("applyResponseChunk", () => {
     expect(responseText(state)).toBe(text);
   });
 
+  it("starts over at a FIRST chunk, dropping a response that never finished", () => {
+    let state = applyResponseChunk(initialResponseState(), responseReport(MSG.FIRST, 300, "x".repeat(238)));
+    state = applyResponseChunk(state, responseReport(MSG.FIRST, 7, '{"a":1}'));
+    expect(state.remaining).toBe(0);
+    expect(responseText(state)).toBe('{"a":1}');
+  });
+
   it("keeps waiting after ACK_RSP and records NACK errors", () => {
     expect(applyResponseChunk(initialResponseState(), responseReport(MSG.ACK_RSP, 0, "")).remaining).toBe(1);
     const nack = applyResponseChunk(initialResponseState(), responseReport(MSG.NACK, 9, "bad thing"));

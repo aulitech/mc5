@@ -8,8 +8,11 @@
 //
 // "Compare" shows two panes side by side, kept in sync: one clock drives both
 // replays (they start together and loop when the longer one ends), and they
-// share one camera, so orbiting either view turns both. Clicking a pane makes
-// it the one the next selected recording, standard gesture or Live fills.
+// share one camera, so orbiting either view turns both. Each pane's dropdown
+// (ViewPicker) chooses what it shows — the first is Live by default, the
+// right-hand one never Live (it opens on a gesture) — and clicking a pane
+// makes it the one a recording chosen in the list fills. Under each pane is
+// the graph of its gesture's template (ViewTemplate).
 // Pressing Record puts every pane back at its rest pose and restarts the
 // replays together, which also undoes live gyro drift. The turn button in the
 // first pane's corner turns every pane's model about the vertical axis
@@ -31,10 +34,10 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { useConfig } from "../../../context/ConfigContext";
 import { useOtaEvent } from "../../../device/useOtaEvent";
 import type { Sample, Triple } from "../../../types/gestures";
-import { STANDARD_GESTURES } from "../data/standardGestures";
-import { fmtTime } from "../lib/format";
 import { useGestureStore, type ViewSource } from "../state/GestureStoreContext";
 import PlaybackTimeline from "./PlaybackTimeline";
+import ViewPicker from "./ViewPicker";
+import ViewTemplate from "./ViewTemplate";
 import styles from "../GestureTab.module.css";
 
 // ── Device orientation → rest pose ──────────────────────────────────────────
@@ -136,8 +139,8 @@ interface Playback {
   meanAcc: Triple;
 }
 
-function createPlayback(source: ViewSource | null): Playback | null {
-  if (!source || source.kind === "live" || source.samples.length === 0) return null;
+function createPlayback(source: ViewSource): Playback | null {
+  if (source.kind === "live" || source.samples.length === 0) return null;
   const { samples } = source;
   const meanAcc: Triple = [0, 0, 0];
   for (const sample of samples) {
@@ -149,17 +152,6 @@ function createPlayback(source: ViewSource | null): Playback | null {
   meanAcc[1] /= samples.length;
   meanAcc[2] /= samples.length;
   return { samples, meanAcc };
-}
-
-function sourceLabel(source: ViewSource) {
-  switch (source.kind) {
-    case "recording":
-      return `${source.gestureName} · ${fmtTime(source.timestamp)}`;
-    case "standard":
-      return STANDARD_GESTURES.find((g) => g.id === source.id)?.label ?? source.id;
-    case "live":
-      return "Live";
-  }
 }
 
 // Disposes every geometry/material under `root`, except ones in `keep`.
@@ -304,7 +296,7 @@ function createPaneScene(mount: HTMLElement, camera: THREE.PerspectiveCamera, ta
 
 interface ViewerPaneProps {
   index: number;
-  source: ViewSource | null;
+  source: ViewSource;
   size: number;
   /** Model turn about Y, in degrees. */
   turn: number;
@@ -315,6 +307,8 @@ interface ViewerPaneProps {
   side: string | null;
   isTarget: boolean;
   onTarget: () => void;
+  /** A take is in progress: what the pane shows can't be changed. */
+  isRecording: boolean;
   /** Drawn over the pane (the record controls). */
   overlay?: ReactNode;
   /** Drawn along the bottom of a replaying pane. */
@@ -324,7 +318,7 @@ interface ViewerPaneProps {
 }
 
 const ViewerPane = ({
-  index, source, size, turn, camera, target, register, side, isTarget, onTarget, overlay, timeline, corner,
+  index, source, size, turn, camera, target, register, side, isTarget, onTarget, isRecording, overlay, timeline, corner,
 }: ViewerPaneProps) => {
   const mountRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<PaneScene | null>(null);
@@ -349,14 +343,8 @@ const ViewerPane = ({
     paneRef.current?.setTurn(turn);
   }, [turn]);
 
-  const label = source ? sourceLabel(source) : "empty";
-  // The right-hand pane's caption sits at its right edge.
-  const captionClass = `${styles.vizCaption} ${corner ? styles.vizCaptionBesideCorner : ""} ${side === "Right" ? styles.vizCaptionRight : ""}`;
-  const emptyMsg = !side
-    ? "Select a gesture to visualize, or choose Live to follow Cato in real time."
-    : isTarget
-      ? "Select a recording or standard gesture, or choose Live, to show it here."
-      : "Click here, then select something to compare.";
+  // The right-hand pane's dropdown sits at its right edge.
+  const pickerClass = `${styles.vizPicker} ${side === "Right" ? styles.vizPickerRight : ""}`;
 
   return (
     <div
@@ -364,21 +352,8 @@ const ViewerPane = ({
       style={{ width: size, height: size }}
       onPointerDown={side ? onTarget : undefined}
     >
-      {side ? (
-        <button
-          className={`btn-plain ${captionClass}`}
-          onClick={onTarget}
-          aria-pressed={isTarget}
-          aria-label={`${side} view: ${label}`}
-          title="Selected recordings, standard gestures and Live load into the highlighted side"
-        >
-          {label}
-        </button>
-      ) : (
-        source && <span className={captionClass}>{label}</span>
-      )}
-      {!source && !overlay && <p className={styles.emptyMsg}>{emptyMsg}</p>}
-      <div ref={mountRef} style={source ? undefined : { display: "none" }} />
+      <ViewPicker index={index} source={source} side={side} disabled={isRecording} className={pickerClass} />
+      <div ref={mountRef} />
       {overlay}
       {timeline}
       {corner}
@@ -397,7 +372,7 @@ interface GestureVisualizerProps {
 
 const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisualizerProps) => {
   const {
-    views, compare, setCompare, targetView, setTargetView, toggleLive, slowMotion, setSlowMotion,
+    views, compare, setCompare, targetView, setTargetView, slowMotion, setSlowMotion,
     positionResets,
   } = useGestureStore();
   const { data } = useConfig();
@@ -424,7 +399,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   const nextTurnStep = (turnStep + 1) % TURNS.length;
   const nextTurn = TURNS[nextTurnStep];
   // Compared with Live, a replay keeps looping (see MAX_PLAYS).
-  const comparingLive = compare && views.some((v) => v?.kind === "live");
+  const comparingLive = compare && views.some((v) => v.kind === "live");
   const pausedRef = useRef(paused);
   const speedRef = useRef(speed);
   const comparingLiveRef = useRef(comparingLive);
@@ -453,11 +428,11 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   const scrubbingRef = useRef(false);
   /** Set to put every pane back at its rest pose and restart the clock on the next frame. */
   const needsResetRef = useRef(true);
-  /** Pane following the sensor stream, or -1. */
-  const liveIndexRef = useRef(-1);
-  /** Set to put the live pane back at its rest pose on the next frame. */
+  /** Panes following the sensor stream. */
+  const liveIndicesRef = useRef<number[]>([]);
+  /** Set to put the live panes back at their rest pose on the next frame. */
   const liveResetRef = useRef(false);
-  /** Gyro readings received since the last frame, for the live pane. */
+  /** Gyro readings received since the last frame, for the live panes. */
   const liveQueueRef = useRef<Triple[]>([]);
 
   const register = useCallback((index: number, pane: PaneScene | null) => {
@@ -471,13 +446,13 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
     needsResetRef.current = true;
   }, [views, compare]);
 
-  // The live pane follows the stream once it's running, from the rest pose.
-  const liveIndex = isStreaming ? visible.findIndex((v) => v?.kind === "live") : -1;
+  // Live panes follow the stream once it's running, from the rest pose.
+  const liveKey = isStreaming ? visible.flatMap((v, i) => (v.kind === "live" ? [i] : [])).join() : "";
   useEffect(() => {
-    liveIndexRef.current = liveIndex;
+    liveIndicesRef.current = liveKey ? liveKey.split(",").map(Number) : [];
     liveQueueRef.current = [];
     liveResetRef.current = true;
-  }, [liveIndex]);
+  }, [liveKey]);
 
   // Pressing Record → every pane back to its rest pose.
   useEffect(() => {
@@ -491,7 +466,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   }, [usbCode, ledCode]);
 
   useOtaEvent("sensor", ({ gyro }) => {
-    if (liveIndexRef.current < 0) return;
+    if (liveIndicesRef.current.length === 0) return;
     const queue = liveQueueRef.current;
     queue.push([gyro.x, gyro.y, gyro.z]);
     if (queue.length > MAX_LIVE_BACKLOG) queue.shift();
@@ -525,8 +500,10 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
         liveResetRef.current = false;
       }
       if (liveResetRef.current) {
-        const live = panes[liveIndexRef.current];
-        if (live) resetPane(live);
+        for (const i of liveIndicesRef.current) {
+          const live = panes[i];
+          if (live) resetPane(live);
+        }
         liveResetRef.current = false;
       }
 
@@ -571,27 +548,27 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
             pane.device.position.y += (acc[1] - pb.meanAcc[1]) / 500;
             pane.device.position.z += (acc[2] - pb.meanAcc[2]) / 500;
           }
-        } else if (i === liveIndexRef.current) {
+        } else if (liveIndicesRef.current.includes(i)) {
           // Live: apply every reading that arrived since the last frame, at
           // the device's own pace. Rotation only — with no recording to take
           // a gravity baseline from, double-integrated acceleration would
           // just drift the model off screen.
           for (const gyro of liveQueueRef.current) applyGyro(pane.device, gyro);
-          liveQueueRef.current = [];
         }
         pane.render();
       });
+      liveQueueRef.current = []; // every live pane has applied them
     }
 
     animId = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animId);
   }, []);
 
-  const hasReplay = visible.some((v) => v && v.kind !== "live");
+  const hasReplay = visible.some((v) => v.kind !== "live");
   // ▶ plays MAX_PLAYS more times; stopped at the end, it starts them over.
   const handlePlayPause = () => {
     if (paused) {
-      const loopLength = Math.max(0, ...visible.map((v) => (v && v.kind !== "live" ? v.samples.length : 0)));
+      const loopLength = Math.max(0, ...visible.map((v) => (v.kind !== "live" ? v.samples.length : 0)));
       if (clockRef.current >= loopLength) needsResetRef.current = true;
       else playsRef.current = 0;
     }
@@ -603,60 +580,52 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   const handleScrub = useCallback((active: boolean) => {
     scrubbingRef.current = active;
   }, []);
-  const targetIsLive = views[targetView]?.kind === "live";
-  const liveTitle = isRecording
-    ? "Unavailable while recording"
-    : targetIsLive
-      ? isStreaming
-        ? "Stop the live view"
-        : "Starting the sensor stream…"
-      : compare
-        ? "Show Cato's movement in real time on the highlighted side"
-        : "Follow Cato's movement in real time";
-
   return (
     <div className={styles.visualizer}>
       <div className={styles.vizPanes}>
         {visible.map((source, i) => (
-          <ViewerPane
-            key={i}
-            index={i}
-            source={source}
-            size={size}
-            turn={turn}
-            camera={camera}
-            target={target}
-            register={register}
-            side={compare ? (i === 0 ? "Left" : "Right") : null}
-            isTarget={compare && i === targetView}
-            onTarget={() => setTargetView(i)}
-            overlay={i === 0 ? overlay : undefined}
-            corner={
-              i === 0 && (
-                <button
-                  className={styles.vizTurnBtn}
-                  onPointerDown={(e) => e.stopPropagation()} // not a click on the pane (Compare's targeting)
-                  onClick={() => setTurnStep(nextTurnStep)}
-                  title={`Model turned ${turn}° about the vertical axis. Click for ${nextTurn}°`}
-                  aria-label={`Turn the model to ${nextTurn}° (now ${turn}°)`}
-                >
-                  {/* The icon leans the way the model is turned */}
-                  <Rotate3d size={18} style={{ transform: `rotate(${-turn}deg)` }} aria-hidden="true" />
-                </button>
-              )
-            }
-            timeline={
-              source && source.kind !== "live" && source.samples.length > 0 ? (
-                <PlaybackTimeline
-                  length={source.samples.length}
-                  sampleRate={SAMPLE_RATE_HZ}
-                  clockRef={clockRef}
-                  onSeek={handleSeek}
-                  onScrub={handleScrub}
-                />
-              ) : undefined
-            }
-          />
+          <div key={i} className={styles.vizColumn}>
+            <ViewerPane
+              index={i}
+              source={source}
+              size={size}
+              turn={turn}
+              camera={camera}
+              target={target}
+              register={register}
+              side={compare ? (i === 0 ? "Left" : "Right") : null}
+              isTarget={compare && i === targetView}
+              onTarget={() => setTargetView(i)}
+              isRecording={isRecording}
+              overlay={i === 0 ? overlay : undefined}
+              corner={
+                i === 0 && (
+                  <button
+                    className={styles.vizTurnBtn}
+                    onPointerDown={(e) => e.stopPropagation()} // not a click on the pane (Compare's targeting)
+                    onClick={() => setTurnStep(nextTurnStep)}
+                    title={`Model turned ${turn}° about the vertical axis. Click for ${nextTurn}°`}
+                    aria-label={`Turn the model to ${nextTurn}° (now ${turn}°)`}
+                  >
+                    {/* The icon leans the way the model is turned */}
+                    <Rotate3d size={18} style={{ transform: `rotate(${-turn}deg)` }} aria-hidden="true" />
+                  </button>
+                )
+              }
+              timeline={
+                source.kind !== "live" && source.samples.length > 0 ? (
+                  <PlaybackTimeline
+                    length={source.samples.length}
+                    sampleRate={SAMPLE_RATE_HZ}
+                    clockRef={clockRef}
+                    onSeek={handleSeek}
+                    onScrub={handleScrub}
+                  />
+                ) : undefined
+              }
+            />
+            <ViewTemplate source={source} width={size} />
+          </div>
         ))}
       </div>
 
@@ -681,15 +650,6 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
             </button>
           </>
         )}
-        <button
-          className={`${styles.btn} ${targetIsLive ? "active" : ""}`}
-          onClick={toggleLive}
-          disabled={isRecording}
-          title={liveTitle}
-          aria-pressed={targetIsLive}
-        >
-          Live
-        </button>
         <button
           className={`${styles.btn} ${compare ? "active" : ""}`}
           onClick={() => setCompare(!compare)}
