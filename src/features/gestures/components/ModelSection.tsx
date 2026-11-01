@@ -1,7 +1,7 @@
 // ModelSection.tsx — The Model section: MODEL_SLOTS dropdowns choose the
 // model's gestures, in order — each Unused, a personal (recorded) gesture or a
 // pretrained (standard) one. Unused slots come only after the filled ones.
-// "Install" (under the last slot) builds the model, asks for Cato to be
+// "Install" (at the right end of the heading) builds the model, asks for Cato to be
 // connected by USB, then saves xcorr_model.zip in Downloads and copies its
 // files to an xcorr_model folder on Cato's drive (see data/catoDrive). The
 // dialog stays open until that's done, then offers to save Cato's settings
@@ -171,9 +171,21 @@ function ModelSection() {
 
   return (
     <>
-      <h3 className={styles.pageSectionTitle}>Model</h3>
-
       <div className={styles.modelSection}>
+        <div className={styles.modelHeader}>
+          <h3 className={styles.pageSectionTitle}>Model</h3>
+          <button
+            className={`btn-primary ${styles.addBtn}`}
+            onClick={handleInstall}
+            disabled={modelSlots.length === 0 || busy}
+            title={
+              modelSlots.length === 0 ? "Choose a gesture for slot 1 first" : "Build the model and install it on Cato"
+            }
+          >
+            <HardDriveDownload size={16} />
+            {isGenerating ? "Building…" : isInstalling ? "Installing…" : "Install"}
+          </button>
+        </div>
         <ol className={styles.modelSlots}>
           {Array.from({ length: MODEL_SLOTS }, (_, i) => {
             const slot = modelSlots[i];
@@ -219,17 +231,6 @@ function ModelSection() {
             );
           })}
         </ol>
-        <button
-          className={`btn-primary ${styles.addBtn}`}
-          onClick={handleInstall}
-          disabled={modelSlots.length === 0 || busy}
-          title={
-            modelSlots.length === 0 ? "Choose a gesture for slot 1 first" : "Build the model and install it on Cato"
-          }
-        >
-          <HardDriveDownload size={16} />
-          {isGenerating ? "Building…" : isInstalling ? "Installing…" : "Install"}
-        </button>
       </div>
       <ConfirmModal
         isOpen={install !== null}

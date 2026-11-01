@@ -11,8 +11,10 @@
 // share one camera, so orbiting either view turns both. Each pane's dropdown
 // (ViewPicker) chooses what it shows — the first is Live by default, the
 // right-hand one never Live (it opens on a gesture) — and clicking a pane
-// makes it the one a recording chosen in the list fills. Under each pane is
-// the graph of its gesture's template (ViewTemplate).
+// makes it the one a recording chosen in the list fills. While anything
+// replays, the playback controls (play/pause, slow motion, graphs) join
+// Compare in the bar docked under the panes; the graph button shows each
+// pane's gesture template graph (ViewTemplate) under it.
 // Pressing Record puts every pane back at its rest pose and restarts the
 // replays together, which also undoes live gyro drift. The turn button in the
 // first pane's corner turns every pane's model about the vertical axis
@@ -27,7 +29,7 @@
 // always holds the current value.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { Rotate3d } from "lucide-react";
+import { ChartLine, Rotate3d } from "lucide-react";
 import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -381,6 +383,8 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
 
   const visible = compare ? views : views.slice(0, 1);
   const size = compare ? COMPARE_PANE_SIZE : PANE_SIZE;
+  // The template graphs under the panes, toggled from the controls bar.
+  const [showGraphs, setShowGraphs] = useState(false);
 
   // Shared by every pane (see createPaneScene).
   const [camera] = useState(() => {
@@ -582,10 +586,13 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   }, []);
   return (
     <div className={styles.visualizer}>
-      <div className={styles.vizPanes}>
-        {visible.map((source, i) => (
-          <div key={i} className={styles.vizColumn}>
+      {/* The panes, with the controls docked under them: Compare, and the
+          playback ones while anything replays. */}
+      <div className={styles.vizStage}>
+        <div className={`${styles.vizPanes} ${styles.vizPanesDocked}`}>
+          {visible.map((source, i) => (
             <ViewerPane
+              key={i}
               index={i}
               source={source}
               size={size}
@@ -624,42 +631,60 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
                 ) : undefined
               }
             />
-            <ViewTemplate source={source} width={size} />
-          </div>
-        ))}
+          ))}
+        </div>
+        <div className={styles.vizPlayback}>
+          {hasReplay && (
+            <>
+              <button
+                className={styles.vizPlayBtn}
+                onClick={handlePlayPause}
+                title={paused ? "Play" : "Pause"}
+                aria-label={paused ? "Play" : "Pause"}
+              >
+                {paused ? "▶" : "⏸"}
+              </button>
+              <button
+                className={styles.vizPlayBtn}
+                onClick={() => setSlowMotion(!slowMotion)}
+                title={slowMotion ? "Normal speed" : "Slow motion"}
+                aria-pressed={slowMotion}
+              >
+                ½×
+              </button>
+              <button
+                className={styles.vizPlayBtn}
+                onClick={() => setShowGraphs(!showGraphs)}
+                title={showGraphs ? "Hide the template graphs" : "Show each gesture's template graph"}
+                aria-label="Template graphs"
+                aria-pressed={showGraphs}
+              >
+                <ChartLine size={16} aria-hidden="true" />
+              </button>
+            </>
+          )}
+          <button
+            className={styles.vizPlayBtn}
+            onClick={() => setCompare(!compare)}
+            disabled={isRecording}
+            title={compare ? "Show one view" : "Show two views side by side, in sync"}
+            aria-pressed={compare}
+          >
+            Compare
+          </button>
+        </div>
       </div>
 
-      <div className={styles.vizControls}>
-        {hasReplay && (
-          <>
-            <button
-              className={styles.btn}
-              onClick={handlePlayPause}
-              title={paused ? "Play" : "Pause"}
-              aria-label={paused ? "Play" : "Pause"}
-            >
-              {paused ? "▶" : "⏸"}
-            </button>
-            <button
-              className={`${styles.btn} ${slowMotion ? "active" : ""}`}
-              onClick={() => setSlowMotion(!slowMotion)}
-              title={slowMotion ? "Normal speed" : "Slow motion"}
-              aria-pressed={slowMotion}
-            >
-              ½×
-            </button>
-          </>
-        )}
-        <button
-          className={`${styles.btn} ${compare ? "active" : ""}`}
-          onClick={() => setCompare(!compare)}
-          disabled={isRecording}
-          title={compare ? "Show one view" : "Show two views side by side, in sync"}
-          aria-pressed={compare}
-        >
-          Compare
-        </button>
-      </div>
+      {/* Each pane's template graph, under it (nothing under Live). */}
+      {hasReplay && showGraphs && (
+        <div className={styles.vizPanes}>
+          {visible.map((source, i) => (
+            <div key={i} style={{ width: size }}>
+              <ViewTemplate source={source} width={size} />
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

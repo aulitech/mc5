@@ -43,8 +43,7 @@
   gap: 0.6rem;
 }
 
-/* A heading with its add button under it ("+ Gesture", "+ Model"), styled
-   like the Profile tab's "Add Profile". */
+/* A section heading. */
 .pageSectionHeader {
   display: flex;
   flex-direction: column;
@@ -52,9 +51,15 @@
   gap: 0.4rem;
 }
 
-/* "+ Gesture" and "+ Model", under their lists: only as wide as their text. */
+/* "+" (new gesture) and Install: primary buttons only as wide as their
+   content. */
 .addBtn {
   align-self: flex-start;
+}
+
+/* "+" for a new gesture, at the right end of the gesture rows. */
+.addGestureBtn {
+  align-self: flex-end;
 }
 
 /* btn-primary has no disabled look of its own. */
@@ -264,11 +269,68 @@
   gap: 0.5rem;
 }
 
-/* A pane with its template graph (ViewTemplate) under it. */
-.vizColumn {
+/* The panes and the playback bar docked under them. */
+.vizStage {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+}
+
+/* Square bottom corners where the playback bar joins on, and the gap between
+   compared panes filled in, so panes and bar make one panel. */
+.vizPanesDocked {
+  background: var(--viz-bg);
+  border-radius: 4px 4px 0 0;
+}
+
+.vizPanesDocked .visualizerWrap {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Play/pause, slow motion, graphs and Compare, in the panes' dark panel so they read as part
+   of the viewer. Pulled up 1px so its top border and the panes' bottom ones
+   are the same line (the panes, positioned, draw over it). */
+.vizPlayback {
+  display: flex;
+  justify-content: center;
+  gap: 0.3rem;
+  margin-top: -1px;
+  padding: 0.15rem 0.4rem;
+  background: var(--viz-bg);
+  color: var(--viz-color);
+  border: 1px solid var(--border);
+  border-radius: 0 0 4px 4px;
+}
+
+.vizPlayBtn {
+  min-width: 2.2rem;
+  padding: 0.2rem 0.5rem;
+  border: none;
+  border-radius: 3px;
+  background: none;
+  color: var(--viz-color);
+  cursor: pointer;
+}
+
+.vizPlayBtn:hover {
+  background: color-mix(in srgb, var(--viz-color) 15%, transparent);
+  color: var(--viz-color);
+}
+
+/* Slow motion, graphs or Compare on. */
+.vizPlayBtn[aria-pressed="true"],
+.vizPlayBtn[aria-pressed="true"]:hover {
+  background: var(--viz-active-bg);
+  color: var(--viz-active-color);
+}
+
+.vizPlayBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vizPlayBtn:focus-visible {
+  outline-color: var(--viz-color);
 }
 
 .viewTemplate .emptyMsg {
@@ -470,14 +532,13 @@
   pointer-events: auto;
 }
 
-/* Record, Accept and Reject over the model: the base button on a panel in
-   the viewer's own (always dark) colours, with the base hover fill. Record
-   lets the live model show through; at 85% the panel keeps --viz-color text
-   above 4.5:1 even over the model's lightest shade. */
+/* Record over the model: blue like the viewer's controls that are on, with
+   the base hover fill. Accept and Reject: the base button on a panel in the
+   viewer's own (always dark) colours. */
 .vizRecordBtn {
-  background: color-mix(in srgb, var(--viz-bg) 85%, transparent);
-  color: var(--viz-color);
-  backdrop-filter: blur(3px);
+  padding: 4px;
+  background: var(--viz-active-bg);
+  color: var(--viz-active-color);
 }
 
 .vizAcceptBtn,
@@ -502,20 +563,6 @@
   opacity: 1;
 }
 
-/* ── Visualizer playback controls ────────────────────────────────────────── */
-.vizControls {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.3rem;
-  align-items: center;
-  background: var(--bg-card);
-  color: var(--color-card);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 0.2rem 0.4rem;
-}
-
 /* ── Model section: the gesture slots, and their template graphs ──────────── */
 
 
@@ -526,6 +573,18 @@
   flex-direction: column;
   gap: 0.75rem;
   width: 260px;
+}
+
+/* "Model" with Install at the right end of the line. */
+.modelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.modelHeader .addBtn {
+  align-self: auto;
 }
 
 .modelSlots {

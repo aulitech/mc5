@@ -5,13 +5,15 @@
 // a pane is live.
 //
 // Data flow:
-//   "+ Gesture" (under the list) or a gesture in it → store.selectGesture → viewer goes
+//   "+" (above the list) or a gesture in it → store.selectGesture → viewer goes
 //   live, Record shown
 //   (hidden again while a recording or standard gesture replays)
 //   Record → useGestureTake (device sensor events) → Accept → store.addRecording
+//   (everything but the viewer pane is locked from Record until Accept/Reject:
+//   RecordOverlay → usePageLock)
 //   store.views (one pane, or two when comparing) → GestureVisualizer, which
 //   replays recordings or follows the device sensor events live
-//   model slots (ModelSection) → "+ Model" → store.buildModel → xcorr_model.zip
+//   model slots (ModelSection) → Install → store.buildModel → xcorr_model.zip
 
 import GestureSummary from "./components/GestureSummary";
 import GestureVisualizer from "./components/GestureVisualizer";

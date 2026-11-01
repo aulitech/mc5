@@ -89,6 +89,8 @@ const PAIRS = [
   ["--viz-success", "--viz-bg", TEXT],
   ["--viz-danger", "--viz-bg", TEXT],
   ["#808080", "--viz-bg", UI],
+  // A viewer control that's on (slow motion, graphs, Compare)
+  ["--viz-active-color", "--viz-active-bg", TEXT],
 ];
 
 // ── Colour maths ──────────────────────────────────────────────────────────────

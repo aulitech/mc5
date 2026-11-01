@@ -2,7 +2,7 @@
 //
 // Clicking a class chooses it as the gesture to record (the viewer goes live,
 // with Record over it); its disclosure arrow shows or hides its recordings.
-// "+ Gesture" (above the list) names a new one. Classes are listed in
+// "+" (above the list, at its right end) names a new one. Classes are listed in
 // the order they were created (see lib/gestureOrder); never alphabetically.
 // From the list the user can also:
 //   • Click a recording to load it in the 3D visualizer (its target pane)
@@ -93,13 +93,17 @@ function GestureSummary() {
   return (
     <div className={styles.summary}>
       {/* Name a new gesture: it's added to the list, with no recordings, and chosen for recording. */}
-      <button className={`btn-primary ${styles.addBtn}`} onClick={handleNewGesture}>
-        <Plus size={16} />
-        Gesture
+      <button
+        className={`btn-primary ${styles.addBtn} ${styles.addGestureBtn}`}
+        onClick={handleNewGesture}
+        title="Add a gesture"
+        aria-label="Add a gesture"
+      >
+        <Plus size={16} aria-hidden="true" />
       </button>
 
       {entries.length === 0 && (
-        <p className={styles.emptyMsg}>No gestures yet. Click + Gesture to add one.</p>
+        <p className={styles.emptyMsg}>No gestures yet. Click + to add one.</p>
       )}
 
       <ul className={styles.summaryList}>
