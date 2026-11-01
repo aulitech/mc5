@@ -4,14 +4,17 @@ import type { Sample } from "../../../types/gestures";
 import {
   addRecordings,
   deleteGesture,
-  deleteModel,
   deleteRecording,
-  getAllModels,
   getAllRecordings,
+  getGestureClasses,
+  getGestureOrder,
   getGestureCounts,
+  getModelSlots,
+  getSlotsFromDevice,
   getRecordingsForGesture,
   renameGesture,
-  saveModel,
+  saveGestureOrder,
+  saveModelSlots,
   saveRecording,
 } from "./gestureDB";
 
@@ -41,6 +44,23 @@ describe("gestureDB", () => {
     ]);
   });
 
+  it("reports each class's first recording, so classes can be listed in creation order", async () => {
+    const first = await saveRecording("order-z", samples);
+    await saveRecording("order-a", samples);
+    await saveRecording("order-z", samples);
+    const classes = (await getGestureClasses()).filter((c) => c.name.startsWith("order-"));
+    const z = classes.find((c) => c.name === "order-z")!;
+    const a = classes.find((c) => c.name === "order-a")!;
+    expect(z).toEqual({ name: "order-z", count: 2, firstId: first });
+    expect(a.firstId).toBeGreaterThan(z.firstId);
+  });
+
+  it("saves the gesture order", async () => {
+    expect(await getGestureOrder()).toEqual([]);
+    await saveGestureOrder(["b", "a"]);
+    expect(await getGestureOrder()).toEqual(["b", "a"]);
+  });
+
   it("renaming onto an existing class merges them", async () => {
     await saveRecording("merge-from", samples);
     await saveRecording("merge-to", samples);
@@ -58,11 +78,12 @@ describe("gestureDB", () => {
     expect((await getGestureCounts())["del"]).toBeUndefined();
   });
 
-  it("saves, lists and deletes models", async () => {
-    const template = { acc_x: [1], acc_y: [1], acc_z: [1], gyro_x: [1], gyro_y: [1], gyro_z: [1] };
-    const model = await saveModel("m", { nod: { template, keptCount: 1, totalCount: 1 } });
-    expect((await getAllModels()).map((m) => m.id)).toContain(model.id);
-    await deleteModel(model.id);
-    expect((await getAllModels()).map((m) => m.id)).not.toContain(model.id);
+  it("saves the model's slots", async () => {
+    expect(await getModelSlots()).toEqual([]);
+    await saveModelSlots([{ kind: "personal", name: "nod" }, { kind: "pretrained", id: "tilt_left" }]);
+    expect(await getModelSlots()).toEqual([{ kind: "personal", name: "nod" }, { kind: "pretrained", id: "tilt_left" }]);
+    expect(await getSlotsFromDevice()).toEqual([]);
+    await saveModelSlots([], ["Idle", "Movement"]);
+    expect(await getSlotsFromDevice()).toEqual(["Idle", "Movement"]);
   });
 });

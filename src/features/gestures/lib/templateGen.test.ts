@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { Sample } from "../../../types/gestures";
-import { WIN, buildTemplate, buildTemplateWithOutlierRejection, fillGaps, preprocessRecording } from "./templateGen";
+import type { Sample, Template } from "../../../types/gestures";
+import {
+  WIN,
+  buildModelFiles,
+  buildTemplate,
+  buildTemplateWithOutlierRejection,
+  fillGaps,
+  preprocessRecording,
+} from "./templateGen";
 
 const still = (): Sample => ({ acc: [0, 0, 9.8], gyro: [0, 0, 0] });
 const moving = (rate: number): Sample => ({ acc: [0, 0, 9.8], gyro: [rate, 0, 0] });
@@ -69,5 +76,16 @@ describe("fillGaps", () => {
     expect(fillGaps(steady)).toEqual(steady);
     const untimed = recording(5, 5, 5);
     expect(fillGaps(untimed)).toBe(untimed);
+  });
+});
+
+describe("buildModelFiles", () => {
+  it("lists the gestures in model_params.csv, then one template file each, in order", () => {
+    const flat = (v: number): Template => ({ acc_x: [v], acc_y: [v], acc_z: [v], gyro_x: [v], gyro_y: [v], gyro_z: [v] });
+    expect(buildModelFiles([["Wrist Flick", flat(1)], ["Nod Up", flat(2)]])).toEqual([
+      ["model_params.csv", `2 ${WIN} 6 10.0\nWrist_Flick\nNod_Up`],
+      ["model_templates_0.csv", "1 1 1 1 1 1"],
+      ["model_templates_1.csv", "2 2 2 2 2 2"],
+    ]);
   });
 });

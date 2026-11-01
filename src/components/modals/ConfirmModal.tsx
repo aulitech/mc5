@@ -4,12 +4,26 @@ interface ConfirmModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  /** The confirm button's text (default "Confirm"). */
+  confirmLabel?: string;
+  /** The cancel button's text (default "Cancel"); null leaves it out. */
+  cancelLabel?: string | null;
+  /** Work is under way: both buttons are disabled and the dialog stays open. */
+  busy?: boolean;
   children?: ReactNode;
 }
 
 const FOCUSABLE = "input, select, textarea, button";
 
-const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProps) => {
+const ConfirmModal = ({
+  isOpen,
+  onClose,
+  onConfirm,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  busy = false,
+  children,
+}: ConfirmModalProps) => {
   const modalRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
@@ -19,11 +33,12 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProp
     return () => clearTimeout(timer);
   }, [isOpen]);
 
-  // Focus the first control on open; keep Tab inside the dialog.
+  // Focus the first control on open, and again when work finishes (a disabled
+  // button loses focus); keep Tab inside the dialog.
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || busy) return;
     modalRef.current?.querySelector<HTMLElement>(FOCUSABLE)?.focus();
-  }, [isOpen]);
+  }, [isOpen, busy]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -32,7 +47,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProp
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        onClose();
+        if (!busy) onClose();
         return;
       }
       if (event.key !== "Tab") return;
@@ -50,7 +65,7 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProp
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, busy]);
 
   if (!isOpen) return null;
 
@@ -84,17 +99,9 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProp
   };
 
   return (
-    <div style={modalOverlayStyle} onClick={onClose}>
-      <div
-        style={modalStyle}
-        onClick={(e) => e.stopPropagation()}
-        ref={modalRef}
-        role="alertdialog"
-        aria-modal="true"
-      >
-        <div style={{ margin: "0 0 1.5rem", fontSize: "large" }}>
-          {children}
-        </div>
+    <div style={modalOverlayStyle} onClick={busy ? undefined : onClose}>
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()} ref={modalRef} role="alertdialog" aria-modal="true">
+        <div style={{ margin: "0 0 1.5rem", fontSize: "large" }}>{children}</div>
         <div
           style={{
             display: "flex",
@@ -102,9 +109,13 @@ const ConfirmModal = ({ isOpen, onClose, onConfirm, children }: ConfirmModalProp
             gap: "1rem",
           }}
         >
-          <button onClick={onClose}>Cancel</button>
-          <button onClick={onConfirm} className="active">
-            Confirm
+          {cancelLabel !== null && (
+            <button onClick={onClose} disabled={busy}>
+              {cancelLabel}
+            </button>
+          )}
+          <button onClick={onConfirm} className="active" disabled={busy}>
+            {confirmLabel}
           </button>
         </div>
       </div>

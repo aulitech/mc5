@@ -4,73 +4,166 @@
 // to "refetch".
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useDevice } from "../../../context/DeviceContext";
 import { errorMessage, notify } from "../../../lib/notify";
-import type { GestureModel, ModelGesture, Recording, Sample } from "../../../types/gestures";
+import type { ModelSlot, Recording, Template } from "../../../types/gestures";
 import * as db from "../data/gestureDB";
+import { loadSlotTemplate } from "../data/slotTemplates";
 import { STANDARD_GESTURES, loadStandardGestureTemplate, templateToSamples } from "../data/standardGestures";
+import { orderGestures, renameIn } from "../lib/gestureOrder";
+import { renamePersonal, setSlot, slotLabel, slotsFromDevice, validSlots } from "../lib/modelSlots";
 import { recordingKey } from "../lib/recordingFile";
-import { buildTemplateWithOutlierRejection, preprocessRecording } from "../lib/templateGen";
-import { GestureStoreContext, VIEW_COUNT, type GestureStore, type ViewSource } from "./GestureStoreContext";
+import { GestureStoreContext, LIVE, VIEW_COUNT, type GestureStore, type ViewSource } from "./GestureStoreContext";
 
 const fail = (action: string) => (err: unknown) => {
   console.error(`Gestures: failed to ${action}`, err);
   notify.error(`Couldn't ${action}: ${errorMessage(err)}`);
 };
 
+const saveOrder = (order: string[]) => db.saveGestureOrder(order).catch(fail("save the gesture order"));
+
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-const toggled = <T,>(set: Set<T>, item: T) => {
-  const next = new Set(set);
-  if (next.has(item)) next.delete(item);
-  else next.add(item);
-  return next;
-};
+const recordingView = (recording: Recording): ViewSource => ({
+  kind: "recording",
+  id: recording.id,
+  gestureName: recording.gestureName,
+  timestamp: recording.timestamp,
+  samples: recording.data,
+});
 
-const without = <T,>(set: Set<T>, item: T) => {
-  if (!set.has(item)) return set;
-  const next = new Set(set);
-  next.delete(item);
-  return next;
-};
+/** What a pane shows for a choice: a personal gesture's newest recording (null if it has none) or a pretrained gesture. */
+async function loadView(choice: ModelSlot): Promise<ViewSource | null> {
+  if (choice.kind === "pretrained") {
+    const template = await loadStandardGestureTemplate(choice.id);
+    return { kind: "standard", id: choice.id, samples: templateToSamples(template) };
+  }
+  const recs = await db.getRecordingsForGesture(choice.name);
+  const newest = recs.reduce<Recording | null>((a, r) => (a && a.id > r.id ? a : r), null);
+  return newest && recordingView(newest);
+}
+
+/**
+ * What the right-hand pane shows when it has nothing to (it's never Live):
+ * the gesture being recorded, else the model's first gesture, else the first
+ * pretrained one. Null if none of them loads.
+ */
+async function loadCompareView(
+  activeGesture: string | null,
+  counts: Record<string, number>,
+  modelSlots: ModelSlot[],
+): Promise<ViewSource | null> {
+  const choices: ModelSlot[] = [
+    ...(activeGesture && counts[activeGesture] > 0 ? [{ kind: "personal", name: activeGesture } as const] : []),
+    ...modelSlots.slice(0, 1),
+    { kind: "pretrained", id: STANDARD_GESTURES[0].id },
+  ];
+  for (const choice of choices) {
+    const view = await loadView(choice).catch(() => null);
+    if (view) return view;
+  }
+  return null;
+}
 
 export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [gestureOrder, setGestureOrder] = useState<string[]>([]);
+  const [positionResets, setPositionResets] = useState(0);
   const [recordings, setRecordings] = useState<Record<string, Recording[]>>({});
-  const [views, setViews] = useState<(ViewSource | null)[]>(() => Array(VIEW_COUNT).fill(null));
+  const [views, setViews] = useState<ViewSource[]>(() => Array(VIEW_COUNT).fill(LIVE));
   const [compare, setCompareState] = useState(false);
   const [targetView, setTargetView] = useState(0);
   const [activeGesture, setActiveGesture] = useState<string | null>(null);
   const [slowMotion, setSlowMotion] = useState(false);
-  const [checkedClasses, setCheckedClasses] = useState<Set<string>>(() => new Set());
-  const [checkedStandards, setCheckedStandards] = useState<Set<string>>(() => new Set());
-  const [models, setModels] = useState<GestureModel[]>([]);
+  const [modelSlots, setModelSlots] = useState<ModelSlot[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
 
+  // Counts and list together, so the list never shows a gesture without its
+  // count (0 for one with no recordings). Every gesture with recordings is
+  // saved in the list, so it stays there if they're all deleted.
+  const showClasses = (classes: db.GestureClassInfo[], savedOrder: string[]) => {
+    const order = orderGestures(savedOrder, classes);
+    const recorded = Object.fromEntries(classes.map((c) => [c.name, c.count]));
+    setCounts(Object.fromEntries(order.map((name) => [name, recorded[name] ?? 0])));
+    setGestureOrder(order);
+    if (order.join("\n") !== savedOrder.join("\n")) saveOrder(order);
+  };
+
+  const refreshCounts = async () => {
+    const [classes, savedOrder] = await Promise.all([db.getGestureClasses(), db.getGestureOrder()]);
+    showClasses(classes, savedOrder);
+  };
+
+  // The slots start as the model installed on the device (its gesture_list),
+  // each time the device reports a list they weren't last set from — on
+  // connecting, or after a new model is installed. Otherwise they're as saved.
+  const { gestureNames } = useDevice();
   useEffect(() => {
-    db.getGestureCounts().then(setCounts).catch(fail("load saved gestures"));
-    db.getAllModels().then(setModels).catch(fail("load saved models"));
-  }, []);
+    Promise.all([db.getGestureClasses(), db.getGestureOrder(), db.getModelSlots(), db.getSlotsFromDevice()])
+      .then(([classes, savedOrder, savedSlots, setFrom]) => {
+        showClasses(classes, savedOrder);
+        const recorded = classes.map((c) => c.name);
+        const isNew = gestureNames.length > 0 && gestureNames.join("\n") !== setFrom.join("\n");
+        if (!isNew) {
+          // The saved slots, less any whose gesture has been deleted.
+          setModelSlots(validSlots(savedSlots, orderGestures(savedOrder, classes)));
+          return;
+        }
+        const { slots, unknown } = slotsFromDevice(gestureNames, recorded);
+        setModelSlots(slots);
+        db.saveModelSlots(slots, gestureNames).catch(fail("save the model's gestures"));
+        if (unknown.length > 0) {
+          notify.info(
+            `Cato's model has ${unknown.join(", ")}, not a personal or pretrained gesture here, ` +
+              `so ${unknown.length === 1 ? "it's" : "they're"} left out of the slots.`,
+          );
+        }
+      })
+      .catch(fail("load saved gestures"));
+  }, [gestureNames]);
 
-  const refreshCounts = () => db.getGestureCounts().then(setCounts);
+  const updateSlots = (fn: (slots: ModelSlot[]) => ModelSlot[]) => {
+    const next = fn(modelSlots);
+    setModelSlots(next);
+    db.saveModelSlots(next).catch(fail("save the model's gestures"));
+  };
 
-  // Put a source in the target pane. Live shows in one pane at most, so
-  // showing it here clears it from the other.
-  const showInTarget = (source: ViewSource | null) =>
-    setViews((prev) =>
-      prev.map((v, i) => (i === targetView ? source : source?.kind === "live" && v?.kind === "live" ? null : v)),
-    );
+  const showIn = (index: number, source: ViewSource) =>
+    setViews((prev) => prev.map((v, i) => (i === index ? source : v)));
 
   // Apply `fn` to every pane, e.g. to drop or relabel a deleted/renamed recording.
-  const updateViews = (fn: (v: ViewSource | null) => ViewSource | null) =>
+  const updateViews = (fn: (v: ViewSource, index: number) => ViewSource) =>
     setViews((prev) => {
       const next = prev.map(fn);
       return next.every((v, i) => v === prev[i]) ? prev : next;
     });
 
+  /** Reload a gesture's recordings, newest first, and return them. */
   const reloadClass = async (gestureName: string) => {
-    const recs = await db.getRecordingsForGesture(gestureName);
-    setRecordings((prev) => ({ ...prev, [gestureName]: [...recs].sort((a, b) => b.id - a.id) }));
+    const recs = [...(await db.getRecordingsForGesture(gestureName))].sort((a, b) => b.id - a.id);
+    setRecordings((prev) => ({ ...prev, [gestureName]: recs }));
+    return recs;
   };
+
+  // What replaces the right-hand pane's gesture when it's deleted, since that
+  // pane is never Live.
+  const compareFallback = () => loadCompareView(activeGesture, counts, modelSlots);
+  const rightShows = (match: (v: ViewSource) => boolean) => views.slice(1).some(match);
+
+  // Should the right-hand pane still end up with nothing to show, it gets
+  // something else.
+  useEffect(() => {
+    if (!compare || views[1]?.kind !== "live") return;
+    let cancelled = false;
+    loadCompareView(activeGesture, counts, modelSlots).then((view) => {
+      if (cancelled) return;
+      if (view) setViews((prev) => prev.map((v, i) => (i === 1 ? view : v)));
+      else setCompareState(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [compare, views, activeGesture, counts, modelSlots]);
 
   const dropClass = (gestureName: string) =>
     setRecordings((prev) => {
@@ -81,18 +174,29 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
 
   const store: GestureStore = {
     activeGesture,
+    addGesture: async (gestureName) => {
+      if (!gestureOrder.includes(gestureName)) {
+        await saveOrder([...gestureOrder, gestureName]);
+        await refreshCounts().catch(fail("load saved gestures"));
+      }
+      store.selectGesture(gestureName);
+    },
+
     selectGesture: (gestureName) => {
       setActiveGesture(gestureName);
       setCompareState(false);
       setTargetView(0);
-      setViews((prev) => prev.map((_, i) => (i === 0 ? { kind: "live" } : null)));
+      setViews((prev) => prev.map(() => LIVE));
       setSlowMotion(false);
     },
 
     counts,
+    gestureOrder,
     recordings,
 
-    loadRecordings: (gestureName) => reloadClass(gestureName).catch(fail("load recordings")),
+    loadRecordings: async (gestureName) => {
+      await reloadClass(gestureName).catch(fail("load recordings"));
+    },
 
     addRecording: async (gestureName, samples) => {
       try {
@@ -109,8 +213,16 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     deleteRecording: async (recording) => {
       try {
         await db.deleteRecording(recording.id);
-        await Promise.all([refreshCounts(), reloadClass(recording.gestureName)]);
-        updateViews((v) => (v?.kind === "recording" && v.id === recording.id ? null : v));
+        const [, remaining] = await Promise.all([refreshCounts(), reloadClass(recording.gestureName)]);
+        // A pane showing it goes Live; the right-hand one, which can't, shows
+        // the gesture's newest recording left, or failing that a fallback.
+        const shown = (v: ViewSource) => v.kind === "recording" && v.id === recording.id;
+        const replacement = remaining[0]
+          ? recordingView(remaining[0])
+          : rightShows(shown)
+            ? await compareFallback()
+            : null;
+        updateViews((v, i) => (shown(v) ? (i > 0 && replacement ? replacement : LIVE) : v));
       } catch (err) {
         fail("delete the recording")(err);
       }
@@ -119,9 +231,12 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     deleteClass: async (gestureName) => {
       try {
         await db.deleteGesture(gestureName);
+        await saveOrder(gestureOrder.filter((n) => n !== gestureName));
         dropClass(gestureName);
-        setCheckedClasses((prev) => without(prev, gestureName));
-        updateViews((v) => (v?.kind === "recording" && v.gestureName === gestureName ? null : v));
+        updateSlots((slots) => renamePersonal(slots, gestureName, null));
+        const shown = (v: ViewSource) => v.kind === "recording" && v.gestureName === gestureName;
+        const replacement = rightShows(shown) ? await compareFallback() : null;
+        updateViews((v, i) => (shown(v) ? (i > 0 && replacement ? replacement : LIVE) : v));
         await refreshCounts();
       } catch (err) {
         fail(`delete "${gestureName}"`)(err);
@@ -131,9 +246,10 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     renameClass: async (oldName, newName) => {
       try {
         await db.renameGesture(oldName, newName);
+        await saveOrder(renameIn(gestureOrder, oldName, newName)); // keep its place in the list
         dropClass(oldName);
-        setCheckedClasses((prev) => (prev.has(oldName) ? new Set(without(prev, oldName)).add(newName) : prev));
-        updateViews((v) => (v?.kind === "recording" && v.gestureName === oldName ? { ...v, gestureName: newName } : v));
+        updateSlots((slots) => renamePersonal(slots, oldName, newName));
+        updateViews((v) => (v.kind === "recording" && v.gestureName === oldName ? { ...v, gestureName: newName } : v));
         setActiveGesture((name) => (name === oldName ? newName : name));
         await Promise.all([refreshCounts(), reloadClass(newName)]);
       } catch (err) {
@@ -171,118 +287,76 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
 
     views,
     compare,
-    setCompare: (on) => {
+    setCompare: async (on) => {
+      if (on) {
+        // The right-hand pane is never Live, so it opens on a gesture.
+        const right = await loadCompareView(activeGesture, counts, modelSlots);
+        if (!right) {
+          notify.error("Couldn't load a gesture to compare with.");
+          return;
+        }
+        showIn(1, right);
+      } else {
+        // Cleared, so comparing next time starts afresh.
+        setViews((prev) => prev.map((v, i) => (i === 0 ? v : LIVE)));
+      }
       setCompareState(on);
-      // Comparing starts by filling the new right-hand pane; leaving it
-      // empties that pane so it doesn't replay hidden.
+      // Comparing starts by targeting the new right-hand pane.
       setTargetView(on ? 1 : 0);
-      if (!on) setViews((prev) => prev.map((v, i) => (i === 0 ? v : null)));
     },
     targetView,
     setTargetView,
 
-    selectRecording: (recording) =>
-      showInTarget({
-        kind: "recording",
-        id: recording.id,
-        gestureName: recording.gestureName,
-        timestamp: recording.timestamp,
-        samples: recording.data,
-      }),
+    selectRecording: (recording) => showIn(targetView, recordingView(recording)),
 
-    selectStandard: async (id) => {
+    showInView: async (index, choice) => {
+      setTargetView(index);
       try {
-        const template = await loadStandardGestureTemplate(id);
-        showInTarget({ kind: "standard", id, samples: templateToSamples(template) });
+        if (!choice) {
+          if (index === 0) showIn(index, LIVE); // only the first pane can be Live
+        } else {
+          const view = await loadView(choice);
+          if (view) showIn(index, view);
+        }
       } catch (err) {
-        fail("load the standard gesture")(err);
+        fail("load the gesture")(err);
       }
     },
 
-    toggleLive: () => showInTarget(views[targetView]?.kind === "live" ? null : { kind: "live" }),
+    positionResets,
+    resetPosition: () => setPositionResets((n) => n + 1),
     slowMotion,
     setSlowMotion,
 
-    checkedClasses,
-    toggleClass: (gestureName) => setCheckedClasses((prev) => toggled(prev, gestureName)),
-    checkedStandards,
-    toggleStandard: (id) => setCheckedStandards((prev) => toggled(prev, id)),
-
-    models,
+    modelSlots,
+    setModelSlot: (index, slot) => updateSlots((slots) => setSlot(slots, index, slot)),
     isGenerating,
 
-    generateModel: async (modelName) => {
+    buildModel: async () => {
       setIsGenerating(true);
-      const gestures: Record<string, ModelGesture> = {};
-      const skipped: string[] = [];
-      const clashes: string[] = [];
-
-      for (const gestureName of checkedClasses) {
+      const templates: [string, Template][] = [];
+      const failed: string[] = [];
+      for (const slot of modelSlots) {
+        const label = slotLabel(slot);
         try {
-          const recs = await db.getRecordingsForGesture(gestureName);
-          const preprocessed = recs
-            .map((r) => preprocessRecording(r.data))
-            .filter((r): r is Sample[] => r !== null);
-          const { template, keptCount, totalCount } = buildTemplateWithOutlierRejection(preprocessed);
-          if (template) gestures[gestureName] = { template, keptCount, totalCount };
-          else skipped.push(gestureName);
+          const template = await loadSlotTemplate(slot);
+          if (template) templates.push([label, template]);
+          else failed.push(label);
         } catch (err) {
-          console.error(`Gestures: template generation failed for "${gestureName}"`, err);
-          skipped.push(gestureName);
+          console.error(`Gestures: couldn't build the template for "${label}"`, err);
+          failed.push(label);
         }
       }
-
-      // Standard gestures already have a finished template — no recordings to
-      // build one from, so just load and attach it directly.
-      for (const id of checkedStandards) {
-        const label = STANDARD_GESTURES.find((g) => g.id === id)?.label ?? id;
-        // A model's classes are keyed by name; don't let a standard gesture
-        // silently replace a recorded class that has the same one.
-        if (gestures[label]) {
-          clashes.push(label);
-          continue;
-        }
-        try {
-          const template = await loadStandardGestureTemplate(id);
-          gestures[label] = { template, keptCount: 1, totalCount: 1 };
-        } catch (err) {
-          console.error(`Gestures: failed to load standard gesture "${id}"`, err);
-          skipped.push(label);
-        }
-      }
-
-      if (skipped.length > 0) {
+      setIsGenerating(false);
+      // Leaving one out would move the gestures after it to other slots.
+      if (failed.length > 0) {
         notify.error(
-          `Left out of the model: ${skipped.join(", ")}. Recordings need the whole gesture inside the capture window.`,
+          `Couldn't build ${failed.join(", ")}, so no model was made. ` +
+            "Recordings need the whole gesture inside the capture window.",
         );
+        return null;
       }
-      if (clashes.length > 0) {
-        notify.error(
-          `Standard ${clashes.join(", ")} left out: a recorded gesture already has that name. Rename one to include both.`,
-        );
-      }
-
-      try {
-        if (Object.keys(gestures).length > 0) {
-          const model = await db.saveModel(modelName, gestures);
-          setModels((prev) => [...prev, model]);
-          setCheckedClasses(new Set());
-          setCheckedStandards(new Set());
-        }
-      } catch (err) {
-        fail("save the model")(err);
-      } finally {
-        setIsGenerating(false);
-      }
-    },
-
-    deleteModel: async (id) => {
-      try {
-        await db.deleteModel(id);
-        setModels((prev) => prev.filter((m) => m.id !== id));
-      } catch (err) {
-        fail("delete the model")(err);
-      }
+      return templates;
     },
   };
 

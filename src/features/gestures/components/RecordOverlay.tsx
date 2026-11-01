@@ -3,9 +3,12 @@
 // Record sits in the middle of the pane and hides once pressed. When the take
 // has data coming in, the timer appears across the top and counts down the
 // capture window; when it runs out, Accept/Reject appear where Record was.
-// See useGestureTake for the steps.
+// See useGestureTake for the steps. From Record until Accept/Reject the rest
+// of the page is locked and dimmed; only the pane stays usable.
 
+import { useRef } from "react";
 import type { GestureTake } from "../hooks/useGestureTake";
+import { usePageLock } from "../hooks/usePageLock";
 import styles from "../GestureTab.module.css";
 
 interface RecordOverlayProps {
@@ -19,6 +22,9 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
   const { phase, progress } = take;
   const showTimer = phase === "ready" || phase === "capturing";
   const reviewing = phase === "review" || phase === "saving";
+  // The record controls sit directly in the pane they're drawn over.
+  const recordRef = useRef<HTMLDivElement>(null);
+  usePageLock(phase !== "idle", () => recordRef.current?.parentElement);
 
   return (
     <>
@@ -41,18 +47,29 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
         </div>
       )}
 
-      <div className={styles.vizRecord}>
+      <div ref={recordRef} className={styles.vizRecord}>
         {phase === "idle" && (
-          <button className={`${styles.btn} ${styles.vizRecordBtn}`} onClick={onRecord}>
+          <button
+            className={`${styles.btn} ${styles.vizRecordBtn}`}
+            onClick={onRecord}
+          >
             Record "{gestureName}"
           </button>
         )}
         {reviewing && (
           <>
-            <button className={styles.btnAccept} onClick={take.accept} disabled={phase === "saving"}>
+            <button
+              className={`${styles.btn} ${styles.vizAcceptBtn}`}
+              onClick={take.accept}
+              disabled={phase === "saving"}
+            >
               {phase === "saving" ? "Saving…" : "Accept"}
             </button>
-            <button className={styles.btnReject} onClick={take.reject} disabled={phase === "saving"}>
+            <button
+              className={`${styles.btn} ${styles.vizRejectBtn}`}
+              onClick={take.reject}
+              disabled={phase === "saving"}
+            >
               Reject
             </button>
           </>

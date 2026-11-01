@@ -47,6 +47,9 @@ const PAIRS = [
   ["--color-card", "--bg-hover", TEXT],
   ["--color-card", "--bg-selected", TEXT],
   ["--primary", "--bg-card", UI], // selected-row outline, accents
+  // Drag handles (muted) on hovered and selected rows
+  ["--color-muted", "--bg-hover", UI],
+  ["--color-muted", "--bg-selected", UI],
   // Edit (green) / delete (red) icons on hovered and selected rows
   ["--success", "--bg-hover", UI],
   ["--success", "--bg-selected", UI],
@@ -75,14 +78,19 @@ const PAIRS = [
   ["--chart-3", "--bg-input", UI],
   ["--color-card", "--bg-input", TEXT],
   ["--color-muted", "--bg", TEXT],
-  // 3D viewer: darkest model shade and deepest axis colour (fixed in
+  // 3D viewer: text and the darkest model shade (fixed in
   // GestureVisualizer.tsx) on the viewer panel
   ["--viz-color", "--viz-bg", TEXT],
-  // Recording timer track drawn over the viewer
+  // Recording timer track drawn over the viewer; the playback timeline
+  // (ticks, labels and playhead) uses --viz-color
   ["--viz-danger", "--viz-bg", UI],
   ["--viz-success", "--viz-bg", UI],
+  // Accept / Reject labels over the viewer
+  ["--viz-success", "--viz-bg", TEXT],
+  ["--viz-danger", "--viz-bg", TEXT],
   ["#808080", "--viz-bg", UI],
-  ["#f57f17", "--viz-bg", UI],
+  // A viewer control that's on (slow motion, graphs, Compare)
+  ["--viz-active-color", "--viz-active-bg", TEXT],
 ];
 
 // ── Colour maths ──────────────────────────────────────────────────────────────

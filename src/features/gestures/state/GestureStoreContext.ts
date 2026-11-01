@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { GestureModel, Recording, Sample } from "../../../types/gestures";
+import type { ModelSlot, Recording, Sample, Template } from "../../../types/gestures";
 import type { RecordingData } from "../lib/recordingFile";
 
 /** What one pane of the 3D visualizer shows. */
@@ -7,6 +7,17 @@ export type ViewSource =
   | { kind: "recording"; id: number; gestureName: string; timestamp: string; samples: Sample[] }
   | { kind: "standard"; id: string; samples: Sample[] }
   | { kind: "live" };
+
+/** The gesture a pane shows, named as a model slot names it; null for Live. */
+export const viewSlot = (source: ViewSource): ModelSlot | null =>
+  source.kind === "live"
+    ? null
+    : source.kind === "recording"
+      ? { kind: "personal", name: source.gestureName }
+      : { kind: "pretrained", id: source.id };
+
+/** What a pane shows unless something else is chosen. */
+export const LIVE: ViewSource = { kind: "live" };
 
 /** Visualizer panes: the first always shows; the second only when comparing. */
 export const VIEW_COUNT = 2;
@@ -17,10 +28,14 @@ export interface GestureStore {
   activeGesture: string | null;
   /** Choose the gesture to record, and set the viewer up for it: one pane, live, normal speed. */
   selectGesture: (gestureName: string) => void;
+  /** Add a gesture to the list (saved, with no recordings yet) and choose it; an existing one is just chosen. */
+  addGesture: (gestureName: string) => Promise<void>;
 
   // ── Recordings ──
-  /** Recording count per gesture class. */
+  /** Recording count per gesture in the list (0 for one with none). */
   counts: Record<string, number>;
+  /** The gestures list, in order (see lib/gestureOrder) — with or without recordings. */
+  gestureOrder: string[];
   /** Recordings per class, newest first — only for classes that have been loaded. */
   recordings: Record<string, Recording[]>;
   loadRecordings: (gestureName: string) => Promise<void>;
@@ -34,33 +49,33 @@ export interface GestureStore {
   importRecordings: (recordings: RecordingData[]) => Promise<void>;
 
   // ── Visualizer ──
-  /** What each pane shows (VIEW_COUNT entries; null = empty). */
-  views: (ViewSource | null)[];
+  /** What each pane shows (VIEW_COUNT entries; LIVE by default). */
+  views: ViewSource[];
   /** Two panes side by side, played in sync, instead of one. */
   compare: boolean;
-  setCompare: (on: boolean) => void;
-  /** The pane that selectRecording/selectStandard/toggleLive fill. */
+  /** Turning it on loads a gesture into the right-hand pane first (it's never Live). */
+  setCompare: (on: boolean) => Promise<void>;
+  /** The pane selectRecording fills (and showInView targets). */
   targetView: number;
   setTargetView: (index: number) => void;
   selectRecording: (recording: Recording) => void;
-  selectStandard: (id: string) => Promise<void>;
-  /** Show the live sensor stream in the target pane, or clear it if it already does. */
-  toggleLive: () => void;
+  /** Show Live (null; first pane only), a personal gesture's newest recording or a pretrained gesture in pane `index`. */
+  showInView: (index: number, choice: ModelSlot | null) => Promise<void>;
+  /** Bumped to put every pane back at its rest pose (pressing Record). */
+  positionResets: number;
+  resetPosition: () => void;
   /** Replays at half speed. */
   slowMotion: boolean;
   setSlowMotion: (on: boolean) => void;
 
-  // ── Model generation ──
-  /** Recorded classes checked for the next model. */
-  checkedClasses: Set<string>;
-  toggleClass: (gestureName: string) => void;
-  /** Built-in standard gestures (by id) checked for the next model. */
-  checkedStandards: Set<string>;
-  toggleStandard: (id: string) => void;
-  models: GestureModel[];
+  // ── Model ──
+  /** The model's gestures, in order: the filled slots (at most MODEL_SLOTS). */
+  modelSlots: ModelSlot[];
+  /** Fill slot `index`, or empty it (null) — later slots move up. */
+  setModelSlot: (index: number, slot: ModelSlot | null) => void;
   isGenerating: boolean;
-  generateModel: (modelName: string) => Promise<void>;
-  deleteModel: (id: number) => Promise<void>;
+  /** Each slot's template, in slot order; null (after notifying) if any couldn't be built. */
+  buildModel: () => Promise<[string, Template][] | null>;
 }
 
 export const GestureStoreContext = createContext<GestureStore | null>(null);

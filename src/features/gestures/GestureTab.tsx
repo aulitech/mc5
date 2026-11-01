@@ -1,19 +1,23 @@
-// GestureTab.tsx — Gesture collection, visualization and template models.
+// GestureTab.tsx — Gesture collection, visualization and the template model.
 //
 // Layout only — state lives in GestureStoreProvider (recordings, viewer,
-// models). The sensor stream runs while a gesture is chosen for recording or
+// model slots). The sensor stream runs while a gesture is chosen for recording or
 // a pane is live.
 //
 // Data flow:
-//   saved gestures list → store.selectGesture → viewer goes live, Record shown
+//   "+" (above the list) or a gesture in it → store.selectGesture → viewer goes
+//   live, Record shown
+//   (hidden again while a recording or standard gesture replays)
 //   Record → useGestureTake (device sensor events) → Accept → store.addRecording
+//   (everything but the viewer pane is locked from Record until Accept/Reject:
+//   RecordOverlay → usePageLock)
 //   store.views (one pane, or two when comparing) → GestureVisualizer, which
 //   replays recordings or follows the device sensor events live
-//   checked classes/standard gestures → Generate model (ModelList) → store.generateModel
+//   model slots (ModelSection) → Install → store.buildModel → xcorr_model.zip
 
 import GestureSummary from "./components/GestureSummary";
 import GestureVisualizer from "./components/GestureVisualizer";
-import ModelList from "./components/ModelList";
+import ModelSection from "./components/ModelSection";
 import RecordOverlay from "./components/RecordOverlay";
 import { useGestureTake } from "./hooks/useGestureTake";
 import { useSensorStream } from "./hooks/useSensorStream";
@@ -25,14 +29,19 @@ import styles from "./GestureTab.module.css";
 const RECORD_MS = 2500;
 
 const GestureTabContent = () => {
-  const { views, compare, activeGesture, selectGesture, addRecording } = useGestureStore();
-  const showsLive = (compare ? views : views.slice(0, 1)).some((v) => v?.kind === "live");
+  const { views, compare, activeGesture, selectGesture, addRecording, resetPosition } = useGestureStore();
+  const visible = compare ? views : views.slice(0, 1);
+  const showsLive = visible.some((v) => v.kind === "live");
+  const replaying = visible.some((v) => v.kind !== "live");
   const isStreaming = useSensorStream(activeGesture !== null || showsLive);
   const take = useGestureTake(RECORD_MS, addRecording);
-
+  // Record stays out of the way of a replay (choosing the gesture, or Live in
+  // the viewer, brings it back); a take already under way keeps its controls.
+  const showRecordControls = activeGesture !== null && (take.phase !== "idle" || !replaying);
   const handleRecord = () => {
     if (!activeGesture) return;
     selectGesture(activeGesture); // back to a single live pane at normal speed
+    resetPosition(); // the take starts from the rest pose
     take.start(activeGesture);
   };
 
@@ -40,7 +49,9 @@ const GestureTabContent = () => {
     <div className={styles.container}>
       <div className={styles.mainLayout}>
         <div className={styles.pageSection}>
-          <h3 className={styles.pageSectionTitle}>Gesture Recordings</h3>
+          <div className={styles.pageSectionHeader}>
+            <h3 className={styles.pageSectionTitle}>Personal Gestures</h3>
+          </div>
           <div className={styles.pageSectionBody}>
             {/* Column 1: saved gestures (choose one to record) */}
             <div className={styles.leftPanel}>
@@ -53,7 +64,7 @@ const GestureTabContent = () => {
                 isStreaming={isStreaming}
                 isRecording={take.phase !== "idle"}
                 overlay={
-                  activeGesture !== null && (
+                  showRecordControls && (
                     <RecordOverlay gestureName={activeGesture} take={take} onRecord={handleRecord} />
                   )
                 }
@@ -63,10 +74,7 @@ const GestureTabContent = () => {
         </div>
 
         <div className={styles.pageSection}>
-          <h3 className={styles.pageSectionTitle}>Gesture Models</h3>
-          <div className={styles.pageSectionBody}>
-            <ModelList />
-          </div>
+          <ModelSection />
         </div>
       </div>
     </div>

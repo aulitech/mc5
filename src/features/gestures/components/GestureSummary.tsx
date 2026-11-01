@@ -2,24 +2,25 @@
 //
 // Clicking a class chooses it as the gesture to record (the viewer goes live,
 // with Record over it); its disclosure arrow shows or hides its recordings.
-// "New gesture" names a new one. From the list the user can also:
+// "+" (above the list, at its right end) names a new one. Classes are listed in
+// the order they were created (see lib/gestureOrder); never alphabetically.
+// From the list the user can also:
 //   • Click a recording to load it in the 3D visualizer (its target pane)
 //   • Delete a single recording
-//   • Rename or delete the entire class (all recordings)
-//   • Check classes / standard gestures for model generation
+//   • Rename or delete a gesture (with all its recordings) — deleting its
+//     recordings one by one leaves the gesture in the list
+// The model's gestures are chosen in the Model section.
 
-import { Pencil, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { useDialog } from "../../../context/DialogContext";
 import { errorMessage, notify } from "../../../lib/notify";
 import type { Recording } from "../../../types/gestures";
-import { STANDARD_GESTURES } from "../data/standardGestures";
 import { fmtTime } from "../lib/format";
 import { exportRecordings, openRecordingFiles } from "../lib/recordingFile";
 import { useGestureStore } from "../state/GestureStoreContext";
 import DisclosureTriangle from "./DisclosureTriangle";
 import styles from "../GestureTab.module.css";
-
 
 function GestureSummary() {
   const store = useGestureStore();
@@ -47,14 +48,9 @@ function GestureSummary() {
     }
   };
 
-  const handleNewGesture = async () => {
-    const name = (await prompt("Name the new gesture:"))?.trim();
-    if (name) store.selectGesture(name);
-  };
-
   const handleDeleteClass = async (e: MouseEvent, name: string) => {
     e.stopPropagation(); // don't also choose the gesture
-    if (!(await confirm(`Delete all recordings for "${name}"?`))) return;
+    if (!(await confirm(`Delete "${name}" and all its recordings?`))) return;
     await store.deleteClass(name);
     replaceExpanded(name);
   };
@@ -63,9 +59,14 @@ function GestureSummary() {
     e.stopPropagation(); // don't also choose the gesture
     const newName = (await prompt("Rename gesture:", name))?.trim();
     if (!newName || newName === name) return;
-    if (store.counts[newName] && !(await confirm(`"${newName}" already exists. Merge "${name}" into it?`))) return;
+    if (newName in store.counts && !(await confirm(`"${newName}" already exists. Merge "${name}" into it?`))) return;
     await store.renameClass(name, newName);
     replaceExpanded(name, newName);
+  };
+
+  const handleNewGesture = async () => {
+    const name = (await prompt("Name the new gesture:"))?.trim();
+    if (name) await store.addGesture(name);
   };
 
   const handleImport = async () => {
@@ -86,32 +87,26 @@ function GestureSummary() {
   };
 
   // Highlight whatever is showing in any pane.
-  const isShown = (kind: "recording" | "standard", id: number | string) =>
-    store.views.some((v) => v?.kind === kind && v.id === id);
-  const entries = Object.entries(store.counts);
-  // A newly named gesture has no recordings (and no class) until its first take is saved.
-  const pending = store.activeGesture !== null && !(store.activeGesture in store.counts) ? store.activeGesture : null;
+  const isShown = (id: number) => store.views.some((v) => v.kind === "recording" && v.id === id);
+  const entries = store.gestureOrder.filter((name) => name in store.counts).map((name) => [name, store.counts[name]] as const);
 
   return (
     <div className={styles.summary}>
-      <button className={styles.btn} onClick={handleNewGesture}>
-        New gesture
+      {/* Name a new gesture: it's added to the list, with no recordings, and chosen for recording. */}
+      <button
+        className={`btn-primary ${styles.addBtn} ${styles.addGestureBtn}`}
+        onClick={handleNewGesture}
+        title="Add a gesture"
+        aria-label="Add a gesture"
+      >
+        <Plus size={16} aria-hidden="true" />
       </button>
 
-      {entries.length === 0 && !pending && (
-        <p className={styles.emptyMsg}>No recordings yet. Choose New gesture to record one.</p>
+      {entries.length === 0 && (
+        <p className={styles.emptyMsg}>No gestures yet. Click + to add one.</p>
       )}
 
       <ul className={styles.summaryList}>
-        {pending && (
-          <li className={styles.classGroup}>
-            <div className={`${styles.summaryItem} ${styles.selected}`}>
-              <span className={styles.disclosure} aria-hidden="true" /> {/* no recordings to show yet */}
-              <span className={styles.gestureCount}>0</span>
-              <span className={styles.gestureName}>{pending}</span>
-            </div>
-          </li>
-        )}
         {entries.map(([name, count]) => {
           const recordings = store.recordings[name];
           const expanded = expandedClasses.has(name);
@@ -132,15 +127,6 @@ function GestureSummary() {
                 >
                   <DisclosureTriangle />
                 </button>
-                <input
-                  type="checkbox"
-                  className={styles.templateCheckbox}
-                  checked={store.checkedClasses.has(name)}
-                  onChange={() => store.toggleClass(name)}
-                  onClick={(e) => e.stopPropagation()}
-                  title="Select for template generation"
-                  aria-label={`Include ${name} in the next model`}
-                />
                 <span className={styles.gestureCount}>{count}</span>
                 <button
                   className={`btn-plain ${styles.gestureName}`}
@@ -164,8 +150,8 @@ function GestureSummary() {
                   <button
                     className="btn-ghost btn-danger"
                     onClick={(e) => handleDeleteClass(e, name)}
-                    title={`Delete all "${name}" recordings`}
-                    aria-label={`Delete all "${name}" recordings`}
+                    title={`Delete "${name}" and its recordings`}
+                    aria-label={`Delete "${name}" and its recordings`}
                   >
                     <Trash2 size={16} color="var(--danger)" />
                   </button>
@@ -176,11 +162,11 @@ function GestureSummary() {
               {expanded && (
                 <ul className={styles.recordingList}>
                   {!recordings && <li className={styles.emptyMsg}>Loading…</li>}
-                  {recordings?.length === 0 && <li className={styles.emptyMsg}>No recordings found.</li>}
+                  {recordings?.length === 0 && <li className={styles.emptyMsg}>No recordings yet.</li>}
                   {recordings?.map((rec) => (
                     <li
                       key={rec.id}
-                      className={`${styles.recordingItem} ${isShown("recording", rec.id) ? styles.active : ""}`}
+                      className={`${styles.recordingItem} ${isShown(rec.id) ? styles.active : ""}`}
                       onClick={() => store.selectRecording(rec)}
                       title="Click to visualize this recording"
                     >
@@ -190,9 +176,9 @@ function GestureSummary() {
                           e.stopPropagation();
                           store.selectRecording(rec);
                         }}
-                        aria-pressed={isShown("recording", rec.id)}
+                        aria-pressed={isShown(rec.id)}
                       >
-                        {fmtTime(rec.timestamp)}
+                        {fmtTime(rec.timestamp)} <span className={styles.sampleCount}>n={rec.data.length}</span>
                       </button>
                       <button
                         className="btn-ghost btn-danger"
@@ -211,44 +197,7 @@ function GestureSummary() {
         })}
       </ul>
 
-      {/* ── Standard gestures ── */}
-      <div className={styles.standardDivider} />
-      <h4 className={styles.standardGesturesHeading}>Standard Gestures</h4>
-      <ul className={`${styles.summaryList} ${styles.standardList}`}>
-        {STANDARD_GESTURES.map((g) => (
-          <li key={g.id} className={styles.classGroup}>
-            <div
-              className={`${styles.summaryItem} ${isShown("standard", g.id) ? styles.selected : ""}`}
-              onClick={() => store.selectStandard(g.id)}
-              title="Click to visualize this gesture"
-            >
-              <input
-                type="checkbox"
-                className={styles.templateCheckbox}
-                checked={store.checkedStandards.has(g.id)}
-                onChange={() => store.toggleStandard(g.id)}
-                onClick={(e) => e.stopPropagation()}
-                title="Select for template generation"
-                aria-label={`Include ${g.label} in the next model`}
-              />
-              <button
-                className={`btn-plain ${styles.gestureName}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  store.selectStandard(g.id);
-                }}
-                aria-pressed={isShown("standard", g.id)}
-              >
-                {g.label}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      {/* ── Recordings files ── */}
-      <div className={styles.standardDivider} />
-      <h4 className={styles.standardGesturesHeading}>Recordings</h4>
+      {/* Recordings files */}
       <div className={styles.recordingFileActions}>
         <button
           className={styles.btn}
