@@ -5,6 +5,12 @@
 // each one runs after the previous finishes. Status, sensor and practice input
 // reports are published as events — subscribe with `on()`, which returns an
 // unsubscribe function.
+//
+// If Cato drops off without close() (it rebooted, or its cable or link
+// dropped), it's opened again as soon as it's back — if the browser announces
+// it, which it does only for a device it kept permission for. Chrome keeps
+// that only for devices with a serial number, which Cato over Bluetooth
+// lacks, so then the user picks it again (the waiting screen's Reconnect).
 
 import type { Config, GlobalInfo, Profile } from "../types/config";
 import type {
@@ -47,7 +53,11 @@ const isMissingNode = (err: unknown) => String(err).toLowerCase().includes("foun
 
 export interface OtaEvents {
   connect: CatoDevice;
-  disconnect: void;
+  /**
+   * `reconnecting`: Cato dropped off on its own and is reconnected when it's
+   * back. `error`: why reconnecting to it failed (it has given up).
+   */
+  disconnect: { reconnecting: boolean; error?: string };
   status: DeviceStatus;
   sensor: SensorReport;
   practice: PracticeInference;
@@ -84,6 +94,8 @@ function emit<K extends keyof OtaEvents>(type: K, payload: OtaEvents[K]) {
 
 let device: HIDDevice | null = null;
 let info: DeviceInfo | null = null;
+/** Cato dropped off on its own: waiting for it to come back (see onHidConnect). */
+let reconnecting = false;
 const practiceDecoder = createPracticeDecoder();
 
 // Logging every sensor-stream report (100/sec while streaming) would be
@@ -108,6 +120,10 @@ const HEARTBEAT_ACK_SLOW_MS = 50;
 let lastStatusBits = -1;
 
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
+
+const isCato = (d: HIDDevice) => FILTERS.some((f) => d.vendorId === f.vendorId && d.productId === f.productId);
 
 export const isConnected = () => device !== null && device.opened;
 
@@ -179,9 +195,57 @@ function onInputReport(event: HIDInputReportEvent) {
   }
 }
 
+// Cato went away without close(): let it go (keeping the permission to open
+// it again) and wait for it to come back.
 function onHidDisconnect(event: HIDConnectionEvent) {
   console.log("HID Device disconnected: event: ", event.device, "device: ", device);
-  if (event.device === device) close().catch(() => {});
+  if (event.device !== device) return;
+  release();
+  reconnecting = true;
+  navigator.hid.addEventListener("connect", onHidConnect);
+  emit("disconnect", { reconnecting: true });
+}
+
+// Tries at opening Cato once it's back, a moment apart: it can show up a
+// little before it's ready.
+const RECONNECT_ATTEMPTS = 3;
+const RECONNECT_RETRY_MS = 1000;
+
+async function onHidConnect(event: HIDConnectionEvent) {
+  if (!reconnecting || device || !isCato(event.device)) return;
+  console.log("[ota] Cato is back, reconnecting: ", event.device);
+  stopWaiting();
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await open(event.device);
+      return;
+    } catch (err) {
+      console.error(`[ota] reconnect attempt ${attempt} failed: `, err);
+      release();
+      await event.device.close().catch(() => {});
+      if (attempt === RECONNECT_ATTEMPTS) {
+        emit("disconnect", { reconnecting: false, error: message(err) });
+        return;
+      }
+      await delay(RECONNECT_RETRY_MS);
+    }
+  }
+}
+
+function stopWaiting() {
+  reconnecting = false;
+  navigator.hid?.removeEventListener("connect", onHidConnect);
+}
+
+/** Drop the open device here (it stays permitted). Returns it. */
+function release() {
+  const d = device;
+  device = null;
+  info = null;
+  inflightRead = null;
+  navigator.hid?.removeEventListener("disconnect", onHidDisconnect);
+  d?.removeEventListener("inputreport", onInputReport);
+  return d;
 }
 
 // ── Commands ──────────────────────────────────────────────────────────────────
@@ -315,11 +379,16 @@ const INIT_ATTEMPTS = 16;
 async function initialize(d: HIDDevice): Promise<DeviceInfo> {
   const response: PendingResponse = { state: initialResponseState() };
   let result: Partial<DeviceInfo> | null = null;
+  let asked = false;
   for (let attempt = 1; attempt <= INIT_ATTEMPTS && !result?.version; attempt++) {
     try {
       // Asked once only: asking again makes Cato answer twice, and the spare
-      // answer would then be read as the next command's.
-      if (attempt === 1) await sendPackets(d, "init");
+      // answer would then be read as the next command's. Unless asking
+      // failed, e.g. Cato wasn't ready yet just after restarting.
+      if (!asked) {
+        await sendPackets(d, "init");
+        asked = true;
+      }
       result = (await receiveResponse(d, response)) as Partial<DeviceInfo>;
       console.log(`Initialization attempt (${attempt})`, result);
     } catch (e) {
@@ -340,28 +409,36 @@ async function initialize(d: HIDDevice): Promise<DeviceInfo> {
  */
 export async function connect(): Promise<CatoDevice | null> {
   const [selected] = await navigator.hid.requestDevice({ filters: FILTERS });
-  if (!selected) return null;
+  if (!selected) return null; // still waiting, if Cato had dropped off
 
+  // Picking Cato again after it dropped off: no longer waiting for it, and
+  // not a disconnect (the app stays where it was).
+  if (reconnecting) stopWaiting();
   await close().catch(() => {}); // drop any previous device and its listeners
   try {
-    device = selected;
-    await selected.open();
-    console.log("Device opened: ", selected);
-    navigator.hid.addEventListener("disconnect", onHidDisconnect);
-    selected.addEventListener("inputreport", onInputReport);
-
-    info = await enqueue(() => initialize(selected));
-    practiceDecoder.reset();
-
-    const connected: CatoDevice = { productName: selected.productName, info };
-    emit("connect", connected);
-    emit("status", parseStatus(new DataView(new Uint8Array([0, 0, 0, info.conn_idx ?? 0]).buffer)));
-    return connected;
+    return await open(selected);
   } catch (error) {
     console.error("Error connecting to device: ", error);
     await close().catch(() => {});
     throw error;
   }
+}
+
+/** Open a permitted Cato and initialize it. Emits "connect" and an initial "status". */
+async function open(selected: HIDDevice): Promise<CatoDevice> {
+  device = selected;
+  await selected.open();
+  console.log("Device opened: ", selected);
+  navigator.hid.addEventListener("disconnect", onHidDisconnect);
+  selected.addEventListener("inputreport", onInputReport);
+
+  info = await enqueue(() => initialize(selected));
+  practiceDecoder.reset();
+
+  const connected: CatoDevice = { productName: selected.productName, info };
+  emit("connect", connected);
+  emit("status", parseStatus(new DataView(new Uint8Array([0, 0, 0, info.conn_idx ?? 0]).buffer)));
+  return connected;
 }
 
 export interface ReadConfigResult {
@@ -414,15 +491,17 @@ export async function readConfig(): Promise<ReadConfigResult> {
   return { config: { global_info, profiles } };
 }
 
-/** Forget the device and emit "disconnect". Safe to call when not connected. */
+/**
+ * Forget the device (and stop waiting for one that dropped off) and emit
+ * "disconnect". Safe to call when not connected.
+ */
 export async function close(): Promise<void> {
-  const d = device;
+  if (reconnecting) {
+    stopWaiting();
+    emit("disconnect", { reconnecting: false });
+  }
+  const d = release();
   if (!d) return;
-  device = null;
-  info = null;
-  inflightRead = null;
-  navigator.hid.removeEventListener("disconnect", onHidDisconnect);
-  d.removeEventListener("inputreport", onInputReport);
 
   try {
     if (d.opened) await d.forget();
@@ -430,7 +509,7 @@ export async function close(): Promise<void> {
   } catch (err) {
     throw new Error(`Error closing device: ${String(err)}`);
   } finally {
-    emit("disconnect", undefined);
+    emit("disconnect", { reconnecting: false });
   }
 }
 

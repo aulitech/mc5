@@ -11,13 +11,19 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
   const [device, setDevice] = useState<CatoDevice | null>(null);
   const [status, setStatus] = useState<DeviceStatus | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
-  useOtaEvent("connect", setDevice);
+  useOtaEvent("connect", (connected) => {
+    setDevice(connected);
+    setIsReconnecting(false);
+  });
   useOtaEvent("status", setStatus);
-  useOtaEvent("disconnect", () => {
-    console.log("Device disconnected");
+  useOtaEvent("disconnect", ({ reconnecting, error }) => {
+    console.log("Device disconnected", reconnecting ? "(waiting for it to come back)" : "");
     setDevice(null);
     setStatus(null);
+    setIsReconnecting(reconnecting);
+    if (error) notify.error(`Couldn't reconnect to Cato. Click Connect to try again. (${error})`);
   });
 
   const connect = useCallback(async () => {
@@ -40,11 +46,12 @@ export const DeviceProvider = ({ children }: { children: ReactNode }) => {
       device,
       status,
       isConnecting,
+      isReconnecting,
       gestureNames: device?.info.gesture_list ?? NO_GESTURES,
       connect,
       disconnect,
     }),
-    [device, status, isConnecting, connect, disconnect],
+    [device, status, isConnecting, isReconnecting, connect, disconnect],
   );
 
   return <DeviceContext.Provider value={value}>{children}</DeviceContext.Provider>;
