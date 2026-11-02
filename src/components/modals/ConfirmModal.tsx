@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { usePageLock } from "../../lib/usePageLock";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -10,6 +11,8 @@ interface ConfirmModalProps {
   cancelLabel?: string | null;
   /** Work is under way: both buttons are disabled and the dialog stays open. */
   busy?: boolean;
+  /** The confirm button is solid red (e.g. "Installing…": don't interrupt). */
+  danger?: boolean;
   children?: ReactNode;
 }
 
@@ -22,10 +25,17 @@ const ConfirmModal = ({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   busy = false,
+  danger = false,
   children,
 }: ConfirmModalProps) => {
+  const overlayRef = useRef<HTMLDivElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // While open, nothing else in the app takes input: not clicks (the overlay
+  // covers it anyway), keyboard focus or the keys of what had it. The overlay
+  // already dims the page.
+  usePageLock(isOpen, () => overlayRef.current, { dim: false });
 
   useEffect(() => {
     // Delay the "in" state a tick so the opacity/transform transition runs.
@@ -99,8 +109,11 @@ const ConfirmModal = ({
   };
 
   return (
-    <div style={modalOverlayStyle} onClick={busy ? undefined : onClose}>
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()} ref={modalRef} role="alertdialog" aria-modal="true">
+    // A click on the backdrop doesn't close it: a stray click (or a press that
+    // starts in the dialog and ends outside it) shouldn't cancel. Cancel or
+    // Escape does.
+    <div style={modalOverlayStyle} ref={overlayRef}>
+      <div style={modalStyle} ref={modalRef} role="alertdialog" aria-modal="true">
         <div style={{ margin: "0 0 1.5rem", fontSize: "large" }}>{children}</div>
         <div
           style={{
@@ -114,7 +127,7 @@ const ConfirmModal = ({
               {cancelLabel}
             </button>
           )}
-          <button onClick={onConfirm} className="active" disabled={busy}>
+          <button onClick={onConfirm} className={danger ? "btn-danger-fill" : "active"} disabled={busy}>
             {confirmLabel}
           </button>
         </div>

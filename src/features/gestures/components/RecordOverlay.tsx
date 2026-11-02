@@ -8,7 +8,7 @@
 
 import { useRef } from "react";
 import type { GestureTake } from "../hooks/useGestureTake";
-import { usePageLock } from "../hooks/usePageLock";
+import { usePageLock } from "../../../lib/usePageLock";
 import styles from "../GestureTab.module.css";
 
 interface RecordOverlayProps {

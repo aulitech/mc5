@@ -14,6 +14,7 @@
 import { HardDriveDownload, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import ConfirmModal from "../../../components/modals/ConfirmModal";
+import { Ring } from "../../../components/ui/Utility";
 import { useDevice } from "../../../context/DeviceContext";
 import ota from "../../../device/ota";
 import { downloadBlob } from "../../../lib/configFile";
@@ -104,9 +105,15 @@ function installDialog(install: InstallStep | null, connected: boolean, actions:
     case "installing":
       return {
         confirmLabel: "Installing…",
-        cancelLabel: "Cancel",
+        cancelLabel: null, // it can't be stopped part way
         onConfirm: () => {},
-        body: p("Installing the model on Cato. Don't unplug it.", true),
+        // A spinner big enough to see that it's still going, in the button's red.
+        body: (
+          <div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+            <Ring size={56} stroke={6} color="var(--danger)" speed={1.4} bgOpacity={0.15} />
+            <p style={{ margin: 0 }}>Installing the model on Cato. Don't unplug it.</p>
+          </div>
+        ),
       };
     case "done":
       if (!install.drive) {
@@ -327,6 +334,7 @@ function ModelSection() {
         confirmLabel={dialog.confirmLabel}
         cancelLabel={dialog.cancelLabel}
         busy={working}
+        danger={install?.step === "installing"} // don't unplug Cato
       >
         {dialog.body}
       </ConfirmModal>
