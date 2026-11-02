@@ -57,11 +57,6 @@
   align-self: flex-start;
 }
 
-/* "+" for a new gesture, at the right end of the gesture rows. */
-.addGestureBtn {
-  align-self: flex-end;
-}
-
 /* btn-primary has no disabled look of its own. */
 .addBtn:disabled,
 .addBtn:disabled:hover {
@@ -89,7 +84,7 @@
   flex-direction: column;
   gap: 0.75rem;
   min-width: 220px;
-  max-width: 260px;
+  max-width: 18rem; /* room for an 8rem gesture name and its row's buttons */
 }
 
 /* Column 2: just the visualizer, sized to its own fixed content */
@@ -233,8 +228,21 @@
   background: var(--bg-selected);
 }
 
-.gestureName {
+/* Wraps past 8rem (a long word too). */
+.summaryItem .gestureName {
+  flex-shrink: 0;
+  max-width: 8rem;
+  overflow-wrap: anywhere;
   font-weight: 500;
+}
+
+/* Text cut short with "…" where it doesn't fit. On the text inside a button,
+   not the button: Chrome doesn't put the "…" on a button's own text. */
+.ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .gestureCount {
@@ -536,6 +544,8 @@
    the base hover fill. Accept and Reject: the base button on a panel in the
    viewer's own (always dark) colours. */
 .vizRecordBtn {
+  max-width: 80%; /* of the pane: past that, the gesture name is cut short with "…" */
+  overflow: hidden;
   padding: 4px;
   background: var(--viz-active-bg);
   color: var(--viz-active-color);
@@ -575,16 +585,16 @@
   width: 260px;
 }
 
-/* "Model" with Install at the right end of the line. */
+/* "Model" with ↺ (reset every slot) just right of it. */
 .modelHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 0.5rem;
 }
 
-.modelHeader .addBtn {
-  align-self: auto;
+.modelHeader button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .modelSlots {
@@ -610,13 +620,44 @@
   color: var(--color-muted);
 }
 
+/* A slot's gesture: plain text like the gesture names in the list (no box,
+   border or arrow), wrapping past 8rem. The <select> lies over it, unseen;
+   hover and keyboard focus show on the text. */
+.modelSlotPick {
+  position: relative;
+  max-width: 9rem; /* 8rem of text, as in the list, plus the padding */
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  overflow-wrap: anywhere;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-card);
+}
+
+.modelSlotPick:hover:not(.modelSlotPickDisabled) {
+  background: var(--bg-hover);
+}
+
+.modelSlotPick:has(.modelSlotSelect:focus-visible) {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.modelSlotPickDisabled {
+  opacity: 0.4;
+}
+
 .modelSlotSelect {
-  flex: 1;
-  min-width: 0;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  font: inherit;
 }
 
 .modelSlotSelect:disabled {
-  opacity: 0.4;
   cursor: not-allowed;
 }
 

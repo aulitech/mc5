@@ -12,6 +12,10 @@ interface ProgressProps {
   gap?: string;
   trackStyle?: CSSProperties;
   barStyle?: CSSProperties;
+  /** Drawn over the track, e.g. a slider. */
+  children?: ReactNode;
+  /** Shown just right of the track, between it and the label. */
+  after?: ReactNode;
 }
 
 // progress bar with label
@@ -24,12 +28,15 @@ const Progress = ({
   gap = "1rem",
   trackStyle,
   barStyle,
+  children,
+  after,
 }: ProgressProps) => (
   <div
     style={{
       display: "flex",
       flexDirection: "row",
       justifyContent: "center",
+      alignItems: "center",
       width: width,
       gap: gap,
     }}
@@ -40,32 +47,40 @@ const Progress = ({
         flex: "1",
         justifyContent: "flex-end",
         alignItems: "center",
+        gap: "0.75rem",
       }}
     >
       <div
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={value}
-        aria-label={typeof label === "string" ? label : undefined}
         style={{
           // progress bar container - set min width to prevent collapse
           minWidth: "8rem",
           width: "25%",
           height: "100%",
-          backgroundColor: bgColor,
+          position: "relative",
           ...trackStyle,
         }}
       >
         <div
-          style={{
-            width: `${value}%`,
-            backgroundColor: color,
-            height: "100%",
-            ...barStyle,
-          }}
-        ></div>
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={value}
+          aria-label={typeof label === "string" ? label : undefined}
+          style={{ height: "100%", backgroundColor: bgColor }}
+        >
+          <div
+            style={{
+              width: `${value}%`,
+              backgroundColor: color,
+              height: "100%",
+              ...barStyle,
+            }}
+          ></div>
+        </div>
+        {/* Beside the progressbar, not in it: its children are presentational. */}
+        {children}
       </div>
+      {after}
     </div>
     <span
       style={{
