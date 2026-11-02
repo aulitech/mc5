@@ -59,6 +59,7 @@ const PAIRS = [
   // Danger is also text: delete buttons, the toolbar's "Save"/"DC" indicators.
   ["--danger", "--bg-card", TEXT],
   ["--danger", "--bg-input", UI], // icons only; no red text sits on inputs
+  ["--color-on-danger", "--danger", TEXT],
   ["--success", "--bg-card", UI],
   ["--led-blue", "--bg-card", UI],
   ["--led-blue", "--bg-header", UI],

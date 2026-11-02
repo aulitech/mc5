@@ -72,6 +72,16 @@ summary:focus-visible {
   color: var(--danger);
 }
 
+/* Solid red: a dialog's button while work that mustn't be interrupted runs
+   (ConfirmModal's `danger`). */
+.btn-danger-fill,
+.btn-danger-fill:hover,
+.btn-danger-fill:disabled {
+  background: var(--danger);
+  color: var(--color-on-danger);
+  border: none;
+}
+
 /* --- INPUTS --- */
 .input-base {
   min-width: 10rem;

@@ -166,6 +166,8 @@
   --primary-hover: light-dark(var(--light-primary-hover), var(--dark-primary-hover));
   --primary-soft: light-dark(var(--light-primary-soft), var(--dark-primary-soft));
   --color-on-primary: light-dark(var(--light-color-on-primary), var(--dark-color-on-primary));
+  /* Text on a --danger fill (a dialog's button while it mustn't be interrupted). */
+  --color-on-danger: light-dark(var(--light-color-on-primary), var(--dark-color-on-primary));
   --focus-ring: light-dark(var(--light-focus-ring), var(--dark-focus-ring));
   --bg-code: light-dark(var(--light-bg-code), var(--dark-bg-code));
   --color-code: light-dark(var(--light-color-code), var(--dark-color-code));
