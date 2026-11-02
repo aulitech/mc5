@@ -1,11 +1,11 @@
 import { useState, type KeyboardEvent } from "react";
-import { ChevronUp, ChevronDown } from "lucide-react";
 import { useConfig } from "../../context/ConfigContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { SchemaNode } from "../../constants/schemas";
-import { clampToRange, parseNumber, textToLeafValue, type NumberRange } from "../../lib/leafValue";
+import { SLIDER_KEYS, clampToRange, textToLeafValue, type NumberRange } from "../../lib/leafValue";
 import type { ConfigPath } from "../../types/config";
 import styles from "./Tree.module.css";
+import NumberSpinner from "../ui/NumberSpinner";
 import { VStack } from "../ui/Utility";
 
 interface LeafNodeProps {
@@ -14,9 +14,6 @@ interface LeafNodeProps {
   path: ConfigPath;
   schema: SchemaNode | null;
 }
-
-// Keys that move a range input.
-const SLIDER_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
 
 // Commit typed text on Enter; drop the draft on Escape.
 const commitKeys =
@@ -113,11 +110,6 @@ const LeafNode = ({ name, value, path, schema }: LeafNodeProps) => {
         step: schema?.step ?? (Number.isInteger(value) ? 1 : 0.1),
       };
       const commit = (n: number) => send(clampToRange(n, range));
-      const commitDraft = () => {
-        const n = draft === null ? null : parseNumber(draft);
-        setDraft(null);
-        if (n !== null && n !== value) commit(n);
-      };
       // Slider: track locally while dragging/arrowing, send when let go.
       const commitSlider = (e: { currentTarget: HTMLInputElement }) => commit(parseFloat(e.currentTarget.value));
 
@@ -131,45 +123,7 @@ const LeafNode = ({ name, value, path, schema }: LeafNodeProps) => {
             width: "fit-content",
           }}
         >
-          <div className="custom-spinner-wrapper" style={{ minWidth: "fit-content", margin: 0 }}>
-            <input
-              type="text"
-              inputMode="decimal"
-              aria-label={label}
-              className="input-base spinner-input input-number-no-spin"
-              style={{
-                fontSize: "smaller",
-                minWidth: "1rem",
-                width: "5rem",
-                textAlign: "right",
-                background: "transparent",
-                border: "none",
-                outline: "none",
-              }}
-              value={draft ?? String(value)}
-              onChange={(e) => setDraft(e.target.value)}
-              onBlur={commitDraft}
-              onKeyDown={commitKeys(commitDraft, cancelDraft)}
-            />
-            <div className="spinner-btns">
-              <button
-                type="button"
-                className="btn-spin"
-                aria-label={`Increase ${label}`}
-                onClick={() => commit(value + range.step)}
-              >
-                <ChevronUp size={12} />
-              </button>
-              <button
-                type="button"
-                className="btn-spin"
-                aria-label={`Decrease ${label}`}
-                onClick={() => commit(value - range.step)}
-              >
-                <ChevronDown size={12} />
-              </button>
-            </div>
-          </div>
+          <NumberSpinner value={value} range={range} label={label} onCommit={send} />
           <input
             type="range"
             className="range-slider"

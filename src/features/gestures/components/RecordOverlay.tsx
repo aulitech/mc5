@@ -52,8 +52,9 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
           <button
             className={`${styles.btn} ${styles.vizRecordBtn}`}
             onClick={onRecord}
+            title={`Record "${gestureName}"`}
           >
-            Record "{gestureName}"
+            <span className={styles.ellipsis}>Record "{gestureName}"</span>
           </button>
         )}
         {reviewing && (
