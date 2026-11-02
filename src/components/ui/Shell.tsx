@@ -52,7 +52,7 @@ const THEME_CYCLE: Record<Theme, { next: Theme; Icon: typeof Sun; title: string 
 const isBrowserSupported = "hid" in navigator && "showOpenFilePicker" in window;
 
 const Shell = () => {
-  const { device, status, isConnecting, connect } = useDevice();
+  const { device, status, isConnecting, isReconnecting, connect } = useDevice();
   const { data, saveConfig } = useConfig();
   const { theme, setTheme, isAdvanced, setIsAdvanced, showExperimental, setShowExperimental } =
     useSettings();
@@ -60,7 +60,11 @@ const Shell = () => {
   // The release on offer while the update screen is open.
   const [update, setUpdate] = useState<Release | null>(null);
 
-  useOtaEvent("disconnect", () => setActiveTab("General"));
+  // Back to General on leaving Cato, but not while it restarts: it comes back
+  // on the same tab.
+  useOtaEvent("disconnect", ({ reconnecting }) => {
+    if (!reconnecting) setActiveTab("General");
+  });
 
   const checkForUpdates = async () => {
     try {
@@ -137,6 +141,26 @@ const Shell = () => {
         </VStack>
       ) : update ? (
         <Update release={update} onClose={() => setUpdate(null)} />
+      ) : isReconnecting ? (
+        <VStack
+          style={{
+            gap: "1rem",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <h3>Cato is restarting…</h3>
+          {/* Chrome forgets a Bluetooth Cato when it drops off (it has no
+              serial number), so picking it again takes a click. If the
+              browser does announce it, it reconnects without one. */}
+          <p>When it's back, click Reconnect and choose it.</p>
+          <button className="btn-primary" onClick={connect}>
+            Reconnect
+          </button>
+          <div>
+            <Ring color="var(--led-blue)" />
+          </div>
+        </VStack>
       ) : !data ? (
         <MainInstructions onConnect={connect} />
       ) : (

@@ -29,7 +29,8 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
     │   └── useOtaEvent.ts  # Subscribe to device events from components
     ├── context/            # SettingsContext, DeviceContext, ConfigContext, DialogContext (+ *Provider.tsx)
     ├── lib/                # notify (toasts), configPath, configEdits (index remaps on delete,
-    │                       # backup validation), leafValue, configFile (backup/restore), releases
+    │                       # backup validation), leafValue, configFile (backup/restore), releases,
+    │                       # usePageLock (inert the page around a modal or the recording viewer)
     ├── types/              # device.ts, config.ts, gestures.ts
     ├── features/gestures/  # Gestures tab: components/, data/ (IndexedDB, standard gestures),
     │                       # lib/templateGen.ts, lib/recordingFile.ts (recordings export/import), hooks/ (sensor stream, recorder, recording take), state/ (store)

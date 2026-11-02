@@ -6,6 +6,7 @@ import {
   buildTemplate,
   buildTemplateWithOutlierRejection,
   fillGaps,
+  parseModelFiles,
   preprocessRecording,
 } from "./templateGen";
 
@@ -87,5 +88,38 @@ describe("buildModelFiles", () => {
       ["model_templates_0.csv", "1 1 1 1 1 1"],
       ["model_templates_1.csv", "2 2 2 2 2 2"],
     ]);
+  });
+});
+
+describe("parseModelFiles", () => {
+  const template = (seed: number): Template =>
+    Object.fromEntries(
+      ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"].map((c, k) => [
+        c,
+        Array.from({ length: WIN }, (_, t) => Math.round((seed + k * 10 + Math.sin(t / 7) * 30) * 1000) / 1000),
+      ]),
+    ) as Template;
+
+  it("reads back what buildModelFiles writes, one window-long take per class", async () => {
+    const files = new Map(buildModelFiles([["Wrist Flick", template(1)], ["yes", template(2)]]));
+    const takes = await parseModelFiles(files.get("model_params.csv")!, async (i) => files.get(`model_templates_${i}.csv`)!);
+    expect(takes.map((t) => t.gestureName)).toEqual(["Wrist Flick", "yes"]);
+    expect(takes[0].data).toHaveLength(WIN);
+    expect(takes[0].data[1]).toEqual({
+      ts: 10,
+      acc: [template(1).acc_x[1], template(1).acc_y[1], template(1).acc_z[1]],
+      gyro: [template(1).gyro_x[1], template(1).gyro_y[1], template(1).gyro_z[1]],
+    });
+    // Built into a template again (Install), each take gives back its template.
+    expect(buildTemplate([preprocessRecording(takes[1].data)])).toEqual(template(2));
+  });
+
+  it("explains files that aren't a model", async () => {
+    const none = async () => "";
+    await expect(parseModelFiles("2 100 6 10.0\nyes", none)).rejects.toThrow("doesn't list the model's gestures");
+    await expect(parseModelFiles("1 50 6 10.0\nyes", none)).rejects.toThrow("aren't 100 samples of 6 values");
+    await expect(parseModelFiles("1 100 6 10.0\nyes", async () => "1 2 3")).rejects.toThrow(
+      'model_templates_0.csv ("yes") isn\'t 100 rows of 6 numbers.',
+    );
   });
 });

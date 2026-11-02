@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import type { ModelSlot } from "../../../types/gestures";
-import { parseSlotValue, renamePersonal, setSlot, slotLabel, slotValue, slotsFromDevice, validSlots } from "./modelSlots";
+import type { ModelSlot, Template } from "../../../types/gestures";
+import { templateToSamples } from "../data/standardGestures";
+import {
+  parseSlotValue,
+  renamePersonal,
+  setSlot,
+  slotLabel,
+  slotValue,
+  slotsFromCato,
+  slotsFromDevice,
+  validSlots,
+} from "./modelSlots";
 
 const wave: ModelSlot = { kind: "personal", name: "Wave" };
 const shake: ModelSlot = { kind: "personal", name: "Shake" };
@@ -54,5 +64,43 @@ describe("model slots", () => {
     expect(renamePersonal([wave, tiltLeft], "Wave", "Hello")).toEqual([{ kind: "personal", name: "Hello" }, tiltLeft]);
     expect(renamePersonal([wave, shake, tiltLeft], "Wave", null)).toEqual([shake, tiltLeft]);
     expect(renamePersonal([wave, shake], "Wave", "Shake")).toEqual([shake]); // merged
+  });
+});
+
+describe("slotsFromCato", () => {
+  const template = (seed: number) =>
+    Object.fromEntries(
+      ["acc_x", "acc_y", "acc_z", "gyro_x", "gyro_y", "gyro_z"].map((c, k) => [
+        c,
+        Array.from({ length: 100 }, (_, t) => seed + k + t / 100),
+      ]),
+    ) as Template;
+  // Each pretrained gesture's shipped template.
+  const shipped: Record<string, Template> = { nod_up: template(1), tilt_left: template(2) };
+  const load = async (id: string) => shipped[id] ?? template(99);
+  const take = (gestureName: string, t: Template) => ({ gestureName, data: templateToSamples(t) });
+
+  it("slots Cato's classes in order, pretrained ones as shipped, the rest personal", async () => {
+    const takes = [
+      take("cw", template(5)),
+      take("Nod Up", template(1)), // as shipped
+      take("tilt left", template(2)), // as shipped, any case
+      take("Nod Down", template(6)), // a pretrained name, but recorded here
+    ];
+    const { slots, personal } = await slotsFromCato(takes, load);
+    expect(slots).toEqual([
+      { kind: "personal", name: "cw" },
+      { kind: "pretrained", id: "nod_up" },
+      { kind: "pretrained", id: "tilt_left" },
+      { kind: "personal", name: "Nod Down" },
+    ]);
+    expect(personal.map((t) => t.gestureName)).toEqual(["cw", "Nod Down"]);
+  });
+
+  it("fills at most MODEL_SLOTS", async () => {
+    const takes = Array.from({ length: 8 }, (_, i) => take(`g${i}`, template(i + 10)));
+    const { slots, personal } = await slotsFromCato(takes, load);
+    expect(slots.map(slotLabel)).toEqual(["g0", "g1", "g2", "g3", "g4", "g5"]);
+    expect(personal).toHaveLength(8);
   });
 });

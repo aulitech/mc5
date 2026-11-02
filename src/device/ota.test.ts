@@ -41,8 +41,13 @@ function fakeCato(answer: (command: string, n: number) => DataView[], readDelays
   const device = {
     opened: false,
     productName: "Cato",
+    vendorId: 0x1915,
+    productId: 0x52dd,
     open: async () => {
       device.opened = true;
+    },
+    close: async () => {
+      device.opened = false;
     },
     forget: async () => {
       device.opened = false;
@@ -67,11 +72,26 @@ function fakeCato(answer: (command: string, n: number) => DataView[], readDelays
   return { device, commands, reads: () => reads };
 }
 
+/** navigator.hid offering `device` in its picker; `fire` sends it a connect/disconnect event. */
 function stubHid(device: unknown) {
+  const listeners = new Map<string, Set<(event: unknown) => void>>();
   vi.stubGlobal("navigator", {
-    hid: { requestDevice: async () => [device], addEventListener: () => {}, removeEventListener: () => {} },
+    hid: {
+      requestDevice: async () => [device],
+      addEventListener: (type: string, fn: (event: unknown) => void) => {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type)!.add(fn);
+      },
+      removeEventListener: (type: string, fn: (event: unknown) => void) => listeners.get(type)?.delete(fn),
+    },
   });
+  return {
+    fire: (type: "connect" | "disconnect", device: unknown) =>
+      [...(listeners.get(type) ?? [])].forEach((fn) => fn({ device })),
+  };
 }
+
+const answersInit = (command: string) => (command === "init" ? chunked(JSON.stringify(INFO)) : []);
 
 describe("connect", () => {
   beforeEach(() => {
@@ -150,5 +170,107 @@ describe("readConfig", () => {
       "config get /profiles/0",
       "config get /profiles/1",
     ]);
+  });
+});
+
+describe("reconnecting", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+  afterEach(async () => {
+    await ota.close();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** Connect to a fake Cato and record the connection events from then on. */
+  async function connected() {
+    const cato = fakeCato(answersInit);
+    const hid = stubHid(cato.device);
+    const connecting = ota.connect();
+    await vi.advanceTimersByTimeAsync(100);
+    await connecting;
+    const events: string[] = [];
+    ota.on("connect", () => events.push("connect"));
+    ota.on("disconnect", ({ reconnecting, error }) =>
+      events.push(`disconnect${reconnecting ? " (reconnecting)" : ""}${error ? `: ${error}` : ""}`),
+    );
+    return { cato, hid, events };
+  }
+
+  it("opens Cato again by itself when it comes back after dropping off (e.g. a reboot)", async () => {
+    const { cato, hid, events } = await connected();
+    hid.fire("disconnect", cato.device);
+    expect(ota.isConnected()).toBe(false);
+
+    // After a reboot the browser hands over a new device object for it.
+    const back = fakeCato(answersInit);
+    hid.fire("connect", back.device);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(events).toEqual(["disconnect (reconnecting)", "connect"]);
+    expect(ota.isConnected()).toBe(true);
+    expect(back.commands).toEqual(["init"]);
+  });
+
+  it("doesn't reconnect after Disconnect, nor to a device that isn't a Cato", async () => {
+    const { cato, hid, events } = await connected();
+    hid.fire("disconnect", cato.device);
+    hid.fire("connect", { ...fakeCato(answersInit).device, productId: 0x1234 }); // not a Cato
+    await vi.advanceTimersByTimeAsync(100);
+    expect(ota.isConnected()).toBe(false);
+
+    await ota.close(); // stop waiting for it
+    const back = fakeCato(answersInit);
+    hid.fire("connect", back.device);
+    await vi.advanceTimersByTimeAsync(100);
+    expect(events).toEqual(["disconnect (reconnecting)", "disconnect"]);
+    expect(back.commands).toEqual([]);
+  });
+
+  it("tries a few times, then gives up and says why", async () => {
+    const { cato, hid, events } = await connected();
+    hid.fire("disconnect", cato.device);
+    const back = fakeCato(answersInit);
+    let opens = 0;
+    back.device.open = async () => {
+      opens++;
+      throw new Error("busy");
+    };
+    hid.fire("connect", back.device);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(opens).toBe(3);
+    expect(events).toEqual(["disconnect (reconnecting)", "disconnect: busy"]);
+    expect(ota.isConnected()).toBe(false);
+  });
+
+  it("asks a Cato that wasn't ready again, once asking works", async () => {
+    const { cato, hid } = await connected();
+    hid.fire("disconnect", cato.device);
+    const back = fakeCato(answersInit);
+    const send = back.device.sendFeatureReport;
+    let sends = 0;
+    back.device.sendFeatureReport = async (id, packet) => {
+      if (sends++ === 0) throw new Error("not ready");
+      return send(id, packet);
+    };
+    hid.fire("connect", back.device);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(ota.isConnected()).toBe(true);
+    expect(back.commands).toEqual(["init"]);
+  });
+
+  it("picks Cato up again through the picker (Reconnect) without a disconnect in between", async () => {
+    const { cato, hid, events } = await connected();
+    hid.fire("disconnect", cato.device);
+    const back = fakeCato(answersInit);
+    stubHid(back.device); // the picker now offers the Cato that came back
+    const connecting = ota.connect();
+    await vi.advanceTimersByTimeAsync(100);
+    await connecting;
+    expect(events).toEqual(["disconnect (reconnecting)", "connect"]);
+    expect(ota.isConnected()).toBe(true);
   });
 });

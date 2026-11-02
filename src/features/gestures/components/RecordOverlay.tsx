@@ -8,7 +8,7 @@
 
 import { useRef } from "react";
 import type { GestureTake } from "../hooks/useGestureTake";
-import { usePageLock } from "../hooks/usePageLock";
+import { usePageLock } from "../../../lib/usePageLock";
 import styles from "../GestureTab.module.css";
 
 interface RecordOverlayProps {
@@ -52,8 +52,9 @@ const RecordOverlay = ({ gestureName, take, onRecord }: RecordOverlayProps) => {
           <button
             className={`${styles.btn} ${styles.vizRecordBtn}`}
             onClick={onRecord}
+            title={`Record "${gestureName}"`}
           >
-            Record "{gestureName}"
+            <span className={styles.ellipsis}>Record "{gestureName}"</span>
           </button>
         )}
         {reviewing && (

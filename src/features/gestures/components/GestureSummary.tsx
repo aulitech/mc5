@@ -2,13 +2,16 @@
 //
 // Clicking a class chooses it as the gesture to record (the viewer goes live,
 // with Record over it); its disclosure arrow shows or hides its recordings.
-// "+" (above the list, at its right end) names a new one. Classes are listed in
+// "+" (below the list) names a new one. Classes are listed in
 // the order they were created (see lib/gestureOrder); never alphabetically.
 // From the list the user can also:
 //   • Click a recording to load it in the 3D visualizer (its target pane)
 //   • Delete a single recording
 //   • Rename or delete a gesture (with all its recordings) — deleting its
 //     recordings one by one leaves the gesture in the list
+// Under the list: Import and Export recordings files, and From Cato, which
+// takes on the model installed on Cato's drive: its personal gestures as one
+// take each, and the model slots set to its gestures.
 // The model's gestures are chosen in the Model section.
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,6 +19,7 @@ import { useState, type MouseEvent } from "react";
 import { useDialog } from "../../../context/DialogContext";
 import { errorMessage, notify } from "../../../lib/notify";
 import type { Recording } from "../../../types/gestures";
+import { canWriteToDrive, openCatoDrive, readModelFolder } from "../data/catoDrive";
 import { fmtTime } from "../lib/format";
 import { exportRecordings, openRecordingFiles } from "../lib/recordingFile";
 import { useGestureStore } from "../state/GestureStoreContext";
@@ -78,6 +82,21 @@ function GestureSummary() {
     }
   };
 
+  // The model on Cato's drive: its personal gestures as one take each, and the
+  // model slots set to match it. Opening the drive may ask for it (or for
+  // access), so it comes straight from the click.
+  const handleImportFromCato = async () => {
+    try {
+      const drive = await openCatoDrive();
+      if (!drive) return;
+      const imported = await readModelFolder(drive);
+      if (imported.length === 0) notify.info("The model on Cato has no gestures.");
+      else await store.importModel(imported);
+    } catch (err) {
+      notify.error(`Couldn't import from Cato: ${errorMessage(err)}`);
+    }
+  };
+
   const handleExport = () =>
     exportRecordings().catch((err) => notify.error(`Couldn't export: ${errorMessage(err)}`));
 
@@ -92,16 +111,6 @@ function GestureSummary() {
 
   return (
     <div className={styles.summary}>
-      {/* Name a new gesture: it's added to the list, with no recordings, and chosen for recording. */}
-      <button
-        className={`btn-primary ${styles.addBtn} ${styles.addGestureBtn}`}
-        onClick={handleNewGesture}
-        title="Add a gesture"
-        aria-label="Add a gesture"
-      >
-        <Plus size={16} aria-hidden="true" />
-      </button>
-
       {entries.length === 0 && (
         <p className={styles.emptyMsg}>No gestures yet. Click + to add one.</p>
       )}
@@ -127,7 +136,6 @@ function GestureSummary() {
                 >
                   <DisclosureTriangle />
                 </button>
-                <span className={styles.gestureCount}>{count}</span>
                 <button
                   className={`btn-plain ${styles.gestureName}`}
                   onClick={(e) => {
@@ -138,6 +146,7 @@ function GestureSummary() {
                 >
                   {name}
                 </button>
+                <span className={styles.gestureCount}>{count}</span>
                 <span className={styles.rowActions}>
                   <button
                     className="btn-ghost"
@@ -197,6 +206,16 @@ function GestureSummary() {
         })}
       </ul>
 
+      {/* Name a new gesture: it's added to the list, with no recordings, and chosen for recording. */}
+      <button
+        className={`btn-primary ${styles.addBtn}`}
+        onClick={handleNewGesture}
+        title="Add a gesture"
+        aria-label="Add a gesture"
+      >
+        <Plus size={16} aria-hidden="true" />
+      </button>
+
       {/* Recordings files */}
       <div className={styles.recordingFileActions}>
         <button
@@ -205,8 +224,18 @@ function GestureSummary() {
           title="Add recordings from files exported by MyCato"
           aria-label="Import recordings"
         >
-          Import…
+          Import
         </button>
+        {canWriteToDrive() && (
+          <button
+            className={styles.btn}
+            onClick={handleImportFromCato}
+            title="Take on the model on Cato (connected by USB): its gestures, one take each, and the model slots"
+            aria-label="Import recordings from Cato"
+          >
+            From Cato
+          </button>
+        )}
         <button
           className={styles.btn}
           onClick={handleExport}
@@ -214,7 +243,7 @@ function GestureSummary() {
           disabled={entries.length === 0}
           title="Save every recording to one file, to back them up or import elsewhere"
         >
-          Export…
+          Export
         </button>
       </div>
     </div>
