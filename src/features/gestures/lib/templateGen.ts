@@ -96,6 +96,10 @@ export function fillGaps(samples: Sample[]): Sample[] {
  * @returns 100-element slice, or null if unusable
  */
 export function preprocessRecording(recorded: Sample[]): Sample[] | null {
+  // Exactly one window long: already trimmed (a template imported from Cato,
+  // see parseModelFiles), so it's used as it is. Takes recorded here are
+  // longer than that.
+  if (recorded.length === WIN) return recorded;
   const samples = fillGaps(recorded);
   let motionStart = 0;
 
@@ -307,6 +311,47 @@ export function buildModelFiles(templates: [string, Template][]): [string, strin
   });
 
   return files;
+}
+
+// Milliseconds between samples at Cato's 100 Hz.
+const SAMPLE_MS = 10;
+
+/**
+ * The reverse of buildModelFiles: each class of a model read back from Cato's
+ * xcorr_model folder, its template as a take one window long (WIN samples at
+ * 100 Hz). Class names have their underscores turned back into spaces.
+ *
+ * @param params - model_params.csv
+ * @param readTemplate - model_templates_<i>.csv for class i
+ * @throws Error with a readable message if the files aren't a model
+ */
+export async function parseModelFiles(
+  params: string,
+  readTemplate: (index: number) => Promise<string>,
+): Promise<{ gestureName: string; data: Sample[] }[]> {
+  const [count, win, cols, , ...names] = params.trim().split(/\s+/);
+  const n = Number(count);
+  if (!Number.isInteger(n) || n < 0 || names.length !== n) {
+    throw new Error("model_params.csv doesn't list the model's gestures.");
+  }
+  if (Number(win) !== WIN || Number(cols) !== TEMPLATE_CHANNELS.length) {
+    throw new Error(`The model's templates aren't ${WIN} samples of ${TEMPLATE_CHANNELS.length} values.`);
+  }
+  const takes = [];
+  for (let i = 0; i < n; i++) {
+    const gestureName = names[i].replace(/_/g, " ");
+    const values = (await readTemplate(i)).trim().split(/\s+/).map(Number);
+    if (values.length !== WIN * TEMPLATE_CHANNELS.length || !values.every(Number.isFinite)) {
+      throw new Error(`model_templates_${i}.csv ("${gestureName}") isn't ${WIN} rows of ${TEMPLATE_CHANNELS.length} numbers.`);
+    }
+    const data: Sample[] = [];
+    for (let t = 0; t < WIN; t++) {
+      const [ax, ay, az, gx, gy, gz] = values.slice(t * 6, t * 6 + 6);
+      data.push({ ts: t * SAMPLE_MS, acc: [ax, ay, az], gyro: [gx, gy, gz] });
+    }
+    takes.push({ gestureName, data });
+  }
+  return takes;
 }
 
 /** The model files (buildModelFiles) as the device's archive, xcorr_model.zip. */

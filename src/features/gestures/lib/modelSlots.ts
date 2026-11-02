@@ -3,8 +3,8 @@
 // first, the unused ones after them — so a slot set to Unused closes up.
 // Each gesture (by its name, the model's key) fills one slot at most.
 
-import type { ModelSlot } from "../../../types/gestures";
-import { STANDARD_GESTURES } from "../data/standardGestures";
+import type { ModelSlot, Sample, Template } from "../../../types/gestures";
+import { STANDARD_GESTURES, templateToSamples } from "../data/standardGestures";
 
 export const MODEL_SLOTS = 6;
 
@@ -82,6 +82,34 @@ export function slotsFromDevice(gestureList: string[], personal: string[]) {
     else unknown.push(name);
   }
   return { slots: dedupe(slots), unknown };
+}
+
+const sameSamples = (a: Sample[], b: Sample[]) =>
+  a.length === b.length &&
+  a.every((s, i) => [...s.acc, ...s.gyro].every((v, k) => Math.abs(v - [...b[i].acc, ...b[i].gyro][k]) < 1e-9));
+
+/**
+ * Slots for the model read from Cato's drive (one take per class, see
+ * readModelFolder), in its order. A class with a pretrained gesture's name and
+ * that gesture's template as it ships fills the pretrained slot; every other
+ * class is a personal gesture, returned in `personal` to import as its take.
+ */
+export async function slotsFromCato<T extends { gestureName: string; data: Sample[] }>(
+  takes: T[],
+  loadPretrained: (id: string) => Promise<Template>,
+) {
+  const slots: ModelSlot[] = [];
+  const personal: T[] = [];
+  for (const take of takes) {
+    const pretrained = STANDARD_GESTURES.find((g) => g.label.toLowerCase() === take.gestureName.toLowerCase());
+    if (pretrained && sameSamples(templateToSamples(await loadPretrained(pretrained.id)), take.data)) {
+      slots.push({ kind: "pretrained", id: pretrained.id });
+    } else {
+      slots.push({ kind: "personal", name: take.gestureName });
+      personal.push(take);
+    }
+  }
+  return { slots: dedupe(slots), personal };
 }
 
 /** Slots after a personal gesture is deleted (null) or renamed. */

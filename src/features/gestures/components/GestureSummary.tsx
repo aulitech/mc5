@@ -9,6 +9,9 @@
 //   • Delete a single recording
 //   • Rename or delete a gesture (with all its recordings) — deleting its
 //     recordings one by one leaves the gesture in the list
+// Under the list: Import and Export recordings files, and From Cato, which
+// takes on the model installed on Cato's drive: its personal gestures as one
+// take each, and the model slots set to its gestures.
 // The model's gestures are chosen in the Model section.
 
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,6 +19,7 @@ import { useState, type MouseEvent } from "react";
 import { useDialog } from "../../../context/DialogContext";
 import { errorMessage, notify } from "../../../lib/notify";
 import type { Recording } from "../../../types/gestures";
+import { canWriteToDrive, openCatoDrive, readModelFolder } from "../data/catoDrive";
 import { fmtTime } from "../lib/format";
 import { exportRecordings, openRecordingFiles } from "../lib/recordingFile";
 import { useGestureStore } from "../state/GestureStoreContext";
@@ -75,6 +79,21 @@ function GestureSummary() {
       if (imported.length > 0) await store.importRecordings(imported);
     } catch (err) {
       notify.error(errorMessage(err));
+    }
+  };
+
+  // The model on Cato's drive: its personal gestures as one take each, and the
+  // model slots set to match it. Opening the drive may ask for it (or for
+  // access), so it comes straight from the click.
+  const handleImportFromCato = async () => {
+    try {
+      const drive = await openCatoDrive();
+      if (!drive) return;
+      const imported = await readModelFolder(drive);
+      if (imported.length === 0) notify.info("The model on Cato has no gestures.");
+      else await store.importModel(imported);
+    } catch (err) {
+      notify.error(`Couldn't import from Cato: ${errorMessage(err)}`);
     }
   };
 
@@ -207,6 +226,16 @@ function GestureSummary() {
         >
           Import
         </button>
+        {canWriteToDrive() && (
+          <button
+            className={styles.btn}
+            onClick={handleImportFromCato}
+            title="Take on the model on Cato (connected by USB): its gestures, one take each, and the model slots"
+            aria-label="Import recordings from Cato"
+          >
+            From Cato
+          </button>
+        )}
         <button
           className={styles.btn}
           onClick={handleExport}

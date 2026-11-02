@@ -11,8 +11,8 @@ import * as db from "../data/gestureDB";
 import { loadSlotTemplate } from "../data/slotTemplates";
 import { STANDARD_GESTURES, loadStandardGestureTemplate, templateToSamples } from "../data/standardGestures";
 import { orderGestures, renameIn } from "../lib/gestureOrder";
-import { renamePersonal, setSlot, slotLabel, slotsFromDevice, validSlots } from "../lib/modelSlots";
-import { recordingKey } from "../lib/recordingFile";
+import { MODEL_SLOTS, renamePersonal, setSlot, slotLabel, slotsFromCato, slotsFromDevice, validSlots } from "../lib/modelSlots";
+import { recordingKey, type RecordingData } from "../lib/recordingFile";
 import { GestureStoreContext, LIVE, VIEW_COUNT, type GestureStore, type ViewSource } from "./GestureStoreContext";
 
 const fail = (action: string) => (err: unknown) => {
@@ -176,6 +176,38 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
       return next;
     });
 
+  // Add imported recordings, skipping any already stored. False (after
+  // notifying) if they couldn't be added.
+  const importRecordings = async (imported: RecordingData[]) => {
+    try {
+      const stored = new Set((await db.getAllRecordings()).map(recordingKey));
+      const fresh = imported.filter((r) => {
+        const key = recordingKey(r);
+        if (stored.has(key)) return false;
+        stored.add(key); // also drops repeats within the import
+        return true;
+      });
+      if (fresh.length > 0) await db.addRecordings(fresh);
+      // Refresh the counts, and any open class lists that gained recordings.
+      const changed = new Set(fresh.map((r) => r.gestureName));
+      await Promise.all([refreshCounts(), ...[...changed].filter((n) => n in recordings).map(reloadClass)]);
+
+      const skipped = imported.length - fresh.length;
+      if (fresh.length === 0) {
+        notify.info(`Nothing new: ${skipped === 1 ? "that recording is" : `all ${skipped} recordings are`} already here.`);
+      } else {
+        notify.success(
+          `Imported ${plural(fresh.length, "recording")} of ${plural(changed.size, "gesture")}.` +
+            (skipped > 0 ? ` Skipped ${skipped} already here.` : ""),
+        );
+      }
+      return true;
+    } catch (err) {
+      fail("import the recordings")(err);
+      return false;
+    }
+  };
+
   const store: GestureStore = {
     activeGesture,
     addGesture: async (gestureName) => {
@@ -262,30 +294,20 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
     },
 
     importRecordings: async (imported) => {
-      try {
-        const stored = new Set((await db.getAllRecordings()).map(recordingKey));
-        const fresh = imported.filter((r) => {
-          const key = recordingKey(r);
-          if (stored.has(key)) return false;
-          stored.add(key); // also drops repeats within the import
-          return true;
-        });
-        if (fresh.length > 0) await db.addRecordings(fresh);
-        // Refresh the counts, and any open class lists that gained recordings.
-        const changed = new Set(fresh.map((r) => r.gestureName));
-        await Promise.all([refreshCounts(), ...[...changed].filter((n) => n in recordings).map(reloadClass)]);
+      await importRecordings(imported);
+    },
 
-        const skipped = imported.length - fresh.length;
-        if (fresh.length === 0) {
-          notify.info(`Nothing new: ${skipped === 1 ? "that recording is" : `all ${skipped} recordings are`} already here.`);
-        } else {
-          notify.success(
-            `Imported ${plural(fresh.length, "recording")} of ${plural(changed.size, "gesture")}.` +
-              (skipped > 0 ? ` Skipped ${skipped} already here.` : ""),
-          );
-        }
+    importModel: async (takes) => {
+      try {
+        const { slots, personal } = await slotsFromCato(takes, loadStandardGestureTemplate);
+        if (personal.length > 0 && !(await importRecordings(personal))) return;
+        updateSlots(() => slots);
+        notify.success(
+          `The model slots are set to Cato's model: ${slots.map(slotLabel).join(", ")}.` +
+            (takes.length > MODEL_SLOTS ? ` It has ${takes.length} gestures; only the first ${MODEL_SLOTS} fit.` : ""),
+        );
       } catch (err) {
-        fail("import the recordings")(err);
+        fail("import Cato's model")(err);
       }
     },
 
