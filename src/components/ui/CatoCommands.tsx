@@ -20,7 +20,11 @@ const CatoCommands = ({ onCheckForUpdates }: { onCheckForUpdates: () => Promise<
   const [pending, setPending] = useState<MenuItem | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const deviceCommand = (command: string) => () => ota.send(command);
+  // Each of these reboots Cato, which drops off USB HID before answering, so
+  // there's no answer to wait for.
+  const rebootCommand = (command: string) => async () => {
+    ota.send(command).catch(() => {});
+  };
 
   const menuItems: MenuItem[] = [
     {
@@ -48,19 +52,19 @@ const CatoCommands = ({ onCheckForUpdates }: { onCheckForUpdates: () => Promise<
     },
     {
       label: "Reset",
-      run: deviceCommand("reboot"),
+      run: rebootCommand("reboot"),
       prompt:
-        "Are you sure you want to reset? Any unsaved settings will be lost. Cato will disconnect and you will need to reconnect after rebooting.",
+        "Are you sure you want to reset? Any unsaved settings will be lost. Cato will disconnect while it reboots: reconnect when it's back.",
     },
     {
       label: "Upgrade",
-      run: deviceCommand("reboot uf2"),
+      run: rebootCommand("reboot uf2"),
       prompt:
         'This upgrade command is only for use with custom firmware. Most users should "Check for Updates" instead. It will reboot Cato into upgrade mode, allowing you to flash new firmware via USB by dragging and dropping a .uf2 file onto the Cato drive using your file manager. Are you sure you want to reboot into upgrade mode?',
     },
     {
       label: "Factory Reset",
-      run: deviceCommand("factory_reset"),
+      run: rebootCommand("factory_reset"),
       prompt:
         "Are you sure you want to factory reset? This will erase all your settings and bluetooth connections, and reboot the device into upgrade mode. Cato will disconnect and you will need to pair before reconnecting.",
     },

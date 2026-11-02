@@ -5,6 +5,11 @@ export interface DeviceContextValue {
   device: CatoDevice | null;
   status: DeviceStatus | null;
   isConnecting: boolean;
+  /**
+   * Cato dropped off on its own (e.g. it's restarting). It's reconnected when
+   * it's back if the browser announces it; otherwise connect() picks it again.
+   */
+  isReconnecting: boolean;
   /** Gesture class labels reported by the device (empty when disconnected). */
   gestureNames: string[];
   connect: () => Promise<void>;
