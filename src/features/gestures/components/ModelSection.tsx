@@ -1,14 +1,16 @@
 // ModelSection.tsx — The Model section: MODEL_SLOTS dropdowns choose the
 // model's gestures, in order — each Unused, a personal (recorded) gesture or a
 // pretrained (standard) one. Unused slots come only after the filled ones.
-// "Install" (at the right end of the heading) builds the model, asks for Cato to be
+// "Install" (under the slots) builds the model, asks for Cato to be
 // connected by USB, then saves xcorr_model.zip in Downloads and copies its
 // files to an xcorr_model folder on Cato's drive (see data/catoDrive). The
 // dialog stays open until that's done, then offers to save Cato's settings
 // and reboot it, since Cato reads the model when it starts.
+// Each slot's menu has Reset, back to the gesture Cato's installed model has
+// in that slot, and ↺ beside the heading resets every slot that way.
 // Any gesture can be viewed, with its template's graph, in the viewer.
 
-import { HardDriveDownload } from "lucide-react";
+import { HardDriveDownload, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import ConfirmModal from "../../../components/modals/ConfirmModal";
 import { useDevice } from "../../../context/DeviceContext";
@@ -19,10 +21,16 @@ import { MODEL_FOLDER, canWriteToDrive, openCatoDrive, writeModelFolder } from "
 import { STANDARD_GESTURES } from "../data/standardGestures";
 import { MODEL_SLOTS, parseSlotValue, slotLabel, slotValue } from "../lib/modelSlots";
 import { buildModelFiles, buildModelZip } from "../lib/templateGen";
+import type { ModelSlot } from "../../../types/gestures";
 import { useGestureStore } from "../state/GestureStoreContext";
 import styles from "../GestureTab.module.css";
 
 const MODEL_ZIP = `${MODEL_FOLDER}.zip`;
+
+// The Reset choice in a slot's menu (not a slot value: those are "" or "kind:…").
+const RESET = "reset";
+
+const sameSlots = (a: ModelSlot[], b: ModelSlot[]) => a.map(slotValue).join("\n") === b.map(slotValue).join("\n");
 
 type InstallStep =
   | { step: "connect"; files: [string, string][] }
@@ -119,7 +127,8 @@ function installDialog(install: InstallStep | null, connected: boolean, actions:
 }
 
 function ModelSection() {
-  const { modelSlots, setModelSlot, gestureOrder, counts, isGenerating, buildModel } = useGestureStore();
+  const { modelSlots, setModelSlot, deviceSlots, resetModelSlots, gestureOrder, counts, isGenerating, buildModel } =
+    useGestureStore();
   // Personal gestures with recordings to build from.
   const personal = gestureOrder.filter((name) => counts[name] > 0);
   const { device } = useDevice();
@@ -175,15 +184,17 @@ function ModelSection() {
         <div className={styles.modelHeader}>
           <h3 className={styles.pageSectionTitle}>Model</h3>
           <button
-            className={`btn-primary ${styles.addBtn}`}
-            onClick={handleInstall}
-            disabled={modelSlots.length === 0 || busy}
+            className="btn-ghost"
+            onClick={resetModelSlots}
+            disabled={!deviceSlots || sameSlots(modelSlots, deviceSlots) || busy}
             title={
-              modelSlots.length === 0 ? "Choose a gesture for slot 1 first" : "Build the model and install it on Cato"
+              !deviceSlots
+                ? "Connect Cato to reset the slots to its model"
+                : "Reset every slot to the model installed on Cato"
             }
+            aria-label="Reset every slot to Cato's model"
           >
-            <HardDriveDownload size={16} />
-            {isGenerating ? "Building…" : isInstalling ? "Installing…" : "Install"}
+            <RotateCcw size={16} aria-hidden="true" />
           </button>
         </div>
         <ol className={styles.modelSlots}>
@@ -196,41 +207,68 @@ function ModelSection() {
             const personalChoices = [...personal, ...own].filter((name) => !taken.has(name));
             const pretrainedChoices = STANDARD_GESTURES.filter((g) => !taken.has(g.label));
             const id = `model-slot-${i}`;
+            const disabled = i > modelSlots.length || busy; // fill the slots in order
+            // Reset: the gesture Cato's model has in this slot (Unused past its last).
+            const deviceSlot = deviceSlots?.[i];
+            const isAsOnCato = slotValue(deviceSlot) === slotValue(slot);
             return (
               <li key={i} className={styles.modelSlot}>
                 <label htmlFor={id} className={styles.modelSlotNumber}>
                   {i + 1}
                 </label>
-                <select
-                  id={id}
-                  className={`input-base ${styles.modelSlotSelect}`}
-                  value={slotValue(slot)}
-                  onChange={(e) => setModelSlot(i, parseSlotValue(e.target.value))}
-                  disabled={i > modelSlots.length || busy} // fill the slots in order
-                  aria-label={`Model gesture ${i + 1}`}
-                >
-                  <option value="">Unused</option>
-                  {personalChoices.length > 0 && (
-                    <optgroup label="Personal">
-                      {personalChoices.map((name) => (
-                        <option key={name} value={slotValue({ kind: "personal", name })}>
-                          {name}
+                {/* The slot's gesture as text, which wraps (a <select> can't), with the
+                    select laid over it, unseen, to choose with. */}
+                <div className={`${styles.modelSlotPick} ${disabled ? styles.modelSlotPickDisabled : ""}`}>
+                  <span aria-hidden="true">{slot ? slotLabel(slot) : "Unused"}</span>
+                  <select
+                    id={id}
+                    className={styles.modelSlotSelect}
+                    value={slotValue(slot)}
+                    onChange={(e) =>
+                      setModelSlot(i, e.target.value === RESET ? (deviceSlot ?? null) : parseSlotValue(e.target.value))
+                    }
+                    disabled={disabled}
+                    aria-label={`Model gesture ${i + 1}`}
+                  >
+                    {deviceSlots && (
+                      <option value={RESET} disabled={isAsOnCato}>
+                        Reset ({deviceSlot ? slotLabel(deviceSlot) : "Unused"})
+                      </option>
+                    )}
+                    <option value="">Unused</option>
+                    {personalChoices.length > 0 && (
+                      <optgroup label="Personal">
+                        {personalChoices.map((name) => (
+                          <option key={name} value={slotValue({ kind: "personal", name })}>
+                            {name}
+                          </option>
+                        ))}
+                      </optgroup>
+                    )}
+                    <optgroup label="Pretrained">
+                      {pretrainedChoices.map((g) => (
+                        <option key={g.id} value={slotValue({ kind: "pretrained", id: g.id })}>
+                          {g.label}
                         </option>
                       ))}
                     </optgroup>
-                  )}
-                  <optgroup label="Pretrained">
-                    {pretrainedChoices.map((g) => (
-                      <option key={g.id} value={slotValue({ kind: "pretrained", id: g.id })}>
-                        {g.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
+                  </select>
+                </div>
               </li>
             );
           })}
         </ol>
+        <button
+          className={`btn-primary ${styles.addBtn}`}
+          onClick={handleInstall}
+          disabled={modelSlots.length === 0 || busy}
+          title={
+            modelSlots.length === 0 ? "Choose a gesture for slot 1 first" : "Build the model and install it on Cato"
+          }
+        >
+          <HardDriveDownload size={16} />
+          {isGenerating ? "Building…" : isInstalling ? "Installing…" : "Install"}
+        </button>
       </div>
       <ConfirmModal
         isOpen={install !== null}

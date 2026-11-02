@@ -14,7 +14,10 @@
 // makes it the one a recording chosen in the list fills. While anything
 // replays, the playback controls (play/pause, slow motion, graphs) join
 // Compare in the bar docked under the panes; the graph button shows each
-// pane's gesture template graph (ViewTemplate) under it.
+// pane's gesture template graph (ViewTemplate) under it. While a pane is
+// Live, ⏸/▶ just left of Compare stops and restarts the sensor stream; the
+// live model holds still while it's stopped and is back at its rest pose
+// when it restarts.
 // Pressing Record puts every pane back at its rest pose and restarts the
 // replays together, which also undoes live gyro drift. The turn button in the
 // first pane's corner turns every pane's model about the vertical axis
@@ -366,13 +369,22 @@ const ViewerPane = ({
 interface GestureVisualizerProps {
   /** The device's sensor stream is running (needed for the live view). */
   isStreaming: boolean;
+  /** The sensor stream is paused from the bar (see onStreamPausedChange). */
+  streamPaused: boolean;
+  onStreamPausedChange: (paused: boolean) => void;
   /** A take is in progress: the panes stay as they are until it's done. */
   isRecording: boolean;
   /** Drawn over the first pane (the record controls). */
   overlay?: ReactNode;
 }
 
-const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisualizerProps) => {
+const GestureVisualizer = ({
+  isStreaming,
+  streamPaused,
+  onStreamPausedChange,
+  isRecording,
+  overlay,
+}: GestureVisualizerProps) => {
   const {
     views, compare, setCompare, targetView, setTargetView, slowMotion, setSlowMotion,
     positionResets,
@@ -450,7 +462,8 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
     needsResetRef.current = true;
   }, [views, compare]);
 
-  // Live panes follow the stream once it's running, from the rest pose.
+  // Live panes follow the stream once it's running, from the rest pose — so
+  // they're reset whenever it restarts, e.g. on ▶ after the stream was paused.
   const liveKey = isStreaming ? visible.flatMap((v, i) => (v.kind === "live" ? [i] : [])).join() : "";
   useEffect(() => {
     liveIndicesRef.current = liveKey ? liveKey.split(",").map(Number) : [];
@@ -569,6 +582,7 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
   }, []);
 
   const hasReplay = visible.some((v) => v.kind !== "live");
+  const hasLive = visible.some((v) => v.kind === "live");
   // ▶ plays MAX_PLAYS more times; stopped at the end, it starts them over.
   const handlePlayPause = () => {
     if (paused) {
@@ -662,6 +676,17 @@ const GestureVisualizer = ({ isStreaming, isRecording, overlay }: GestureVisuali
                 <ChartLine size={16} aria-hidden="true" />
               </button>
             </>
+          )}
+          {hasLive && (
+            <button
+              className={styles.vizPlayBtn}
+              onClick={() => onStreamPausedChange(!streamPaused)}
+              disabled={isRecording}
+              title={streamPaused ? "Start the live view again, from the rest pose" : "Pause the live view"}
+              aria-label={streamPaused ? "Resume the live view" : "Pause the live view"}
+            >
+              {streamPaused ? "▶" : "⏸"}
+            </button>
           )}
           <button
             className={styles.vizPlayBtn}

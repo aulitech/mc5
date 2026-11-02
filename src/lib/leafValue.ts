@@ -8,6 +8,9 @@ export interface NumberRange {
   step: number;
 }
 
+/** Keys that move a range input. */
+export const SLIDER_KEYS = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"]);
+
 /** Decimal places implied by a step, e.g. 0.05 → 2. */
 export const stepPrecision = (step: number) => step.toString().split(".")[1]?.length ?? 0;
 

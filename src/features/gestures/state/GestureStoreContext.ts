@@ -73,6 +73,13 @@ export interface GestureStore {
   modelSlots: ModelSlot[];
   /** Fill slot `index`, or empty it (null) — later slots move up. */
   setModelSlot: (index: number, slot: ModelSlot | null) => void;
+  /**
+   * The slots as the model installed on Cato has them (from its gesture
+   * list, as when the slots are first filled); null with no Cato connected.
+   */
+  deviceSlots: ModelSlot[] | null;
+  /** Set every slot back to deviceSlots. */
+  resetModelSlots: () => void;
   isGenerating: boolean;
   /** Each slot's template, in slot order; null (after notifying) if any couldn't be built. */
   buildModel: () => Promise<[string, Template][] | null>;

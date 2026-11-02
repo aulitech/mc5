@@ -122,6 +122,10 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
       .catch(fail("load saved gestures"));
   }, [gestureNames]);
 
+  // What the slots are reset to (see slotsFromDevice).
+  const recorded = gestureOrder.filter((name) => counts[name] > 0);
+  const deviceSlots = gestureNames.length > 0 ? slotsFromDevice(gestureNames, recorded).slots : null;
+
   const updateSlots = (fn: (slots: ModelSlot[]) => ModelSlot[]) => {
     const next = fn(modelSlots);
     setModelSlots(next);
@@ -330,6 +334,10 @@ export const GestureStoreProvider = ({ children }: { children: ReactNode }) => {
 
     modelSlots,
     setModelSlot: (index, slot) => updateSlots((slots) => setSlot(slots, index, slot)),
+    deviceSlots,
+    resetModelSlots: () => {
+      if (deviceSlots) updateSlots(() => deviceSlots);
+    },
     isGenerating,
 
     buildModel: async () => {
