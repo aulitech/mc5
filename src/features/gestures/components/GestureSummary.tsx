@@ -9,7 +9,7 @@
 //   • Delete a single recording
 //   • Rename or delete a gesture (with all its recordings) — deleting its
 //     recordings one by one leaves the gesture in the list
-// Under the list: Import… and Export… recordings files, and From Cato, which
+// Under the list: Import and Export recordings files, and From Cato, which
 // takes on the model installed on Cato's drive: its personal gestures as one
 // take each, and the model slots set to its gestures.
 // The model's gestures are chosen in the Model section.
