@@ -47,6 +47,12 @@ export interface GestureStore {
   renameClass: (oldName: string, newName: string) => Promise<void>;
   /** Add imported recordings, skipping any already stored (same class and timestamp). */
   importRecordings: (recordings: RecordingData[]) => Promise<void>;
+  /**
+   * Take on the model read from Cato's drive (one take per class): its
+   * personal gestures are imported as recordings, and the slots set to its
+   * gestures, in its order.
+   */
+  importModel: (takes: RecordingData[]) => Promise<void>;
 
   // ── Visualizer ──
   /** What each pane shows (VIEW_COUNT entries; LIVE by default). */
