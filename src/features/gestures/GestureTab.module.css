@@ -454,13 +454,13 @@
 
 /* Text drawn straight on the dark viewer panel (e.g. the empty-state hint). */
 /* What the pane shows (ViewPicker): a compact dropdown in its top corner,
-   clear of the turn button. */
+   clear of the reset and turn buttons. */
 .vizPicker {
   position: absolute;
   top: 0.35rem;
   left: 0.4rem;
   z-index: 1;
-  max-width: calc(100% - 2.8rem);
+  max-width: calc(100% - 4.4rem);
   padding: 0.1rem 0.2rem;
   font: inherit;
   font-size: 0.75rem;
@@ -481,12 +481,19 @@
   right: 0.4rem;
 }
 
-/* Turns the model about Y (-22.5°, 0°, 22.5°) in every pane. */
-.vizTurnBtn {
+/* The first pane's top right corner: reset to the rest pose, then turn. */
+.vizCorner {
   position: absolute;
   top: 0.2rem;
   right: 0.25rem;
   z-index: 2;
+  display: flex;
+  gap: 0.15rem;
+}
+
+/* A corner button: reset, or turn the model about Y (-22.5°, 0°, 22.5°) in
+   every pane. */
+.vizTurnBtn {
   display: flex;
   padding: 0.2rem;
   border: none;
@@ -496,7 +503,12 @@
   cursor: pointer;
 }
 
-.vizTurnBtn:hover {
+.vizTurnBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vizTurnBtn:hover:not(:disabled) {
   background: color-mix(in srgb, var(--viz-color) 15%, transparent);
 }
 

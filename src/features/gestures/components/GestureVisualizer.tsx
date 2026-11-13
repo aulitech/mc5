@@ -19,9 +19,10 @@
 // live model holds still while it's stopped and is back at its rest pose
 // when it restarts.
 // Pressing Record puts every pane back at its rest pose and restarts the
-// replays together, which also undoes live gyro drift. The turn button in the
-// first pane's corner turns every pane's model about the vertical axis
-// (0°, 22.5°, 0°, -22.5°, …), to see a gesture a little from either side.
+// replays together, which also undoes live gyro drift; so does the reset
+// button in the first pane's corner. The turn button beside it turns every
+// pane's model about the vertical axis (0°, 22.5°, 0°, -22.5°, …), to see a
+// gesture a little from either side.
 // The record controls (RecordOverlay) are drawn over the first pane, and a
 // pane that replays has a timeline (PlaybackTimeline) along its bottom that
 // shows and moves that clock.
@@ -32,7 +33,7 @@
 // always holds the current value.
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { ChartLine, Rotate3d } from "lucide-react";
+import { ChartLine, Rotate3d, RotateCcw } from "lucide-react";
 import * as THREE from "three";
 import { STLLoader } from "three/addons/loaders/STLLoader.js";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -342,7 +343,7 @@ interface ViewerPaneProps {
   overlay?: ReactNode;
   /** Drawn along the bottom of a replaying pane. */
   timeline?: ReactNode;
-  /** Drawn in the top right corner (the turn button). */
+  /** Drawn in the top right corner (the reset and turn buttons). */
   corner?: ReactNode;
 }
 
@@ -646,16 +647,29 @@ const GestureVisualizer = ({
               overlay={i === 0 ? overlay : undefined}
               corner={
                 i === 0 && (
-                  <button
-                    className={styles.vizTurnBtn}
-                    onPointerDown={(e) => e.stopPropagation()} // not a click on the pane (Compare's targeting)
-                    onClick={() => setTurnStep(nextTurnStep)}
-                    title={`Model turned ${turn}° about the vertical axis. Click for ${nextTurn}°`}
-                    aria-label={`Turn the model to ${nextTurn}° (now ${turn}°)`}
-                  >
-                    {/* The icon leans the way the model is turned */}
-                    <Rotate3d size={18} style={{ transform: `rotate(${-turn}deg)` }} aria-hidden="true" />
-                  </button>
+                  // stopPropagation: not a click on the pane (Compare's targeting)
+                  <div className={styles.vizCorner} onPointerDown={(e) => e.stopPropagation()}>
+                    <button
+                      className={styles.vizTurnBtn}
+                      onClick={() => {
+                        needsResetRef.current = true;
+                      }}
+                      disabled={isRecording}
+                      title="Back to the starting orientation (the USB/LED orientation in the General tab)"
+                      aria-label="Reset the model to its starting orientation"
+                    >
+                      <RotateCcw size={18} aria-hidden="true" />
+                    </button>
+                    <button
+                      className={styles.vizTurnBtn}
+                      onClick={() => setTurnStep(nextTurnStep)}
+                      title={`Model turned ${turn}° about the vertical axis. Click for ${nextTurn}°`}
+                      aria-label={`Turn the model to ${nextTurn}° (now ${turn}°)`}
+                    >
+                      {/* The icon leans the way the model is turned */}
+                      <Rotate3d size={18} style={{ transform: `rotate(${-turn}deg)` }} aria-hidden="true" />
+                    </button>
+                  </div>
                 )
               }
               timeline={
