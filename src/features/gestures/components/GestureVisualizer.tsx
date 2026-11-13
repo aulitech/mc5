@@ -67,17 +67,29 @@ const MESH_CORRECTION_QUAT = new THREE.Quaternion().setFromEuler(MESH_CORRECTION
 const LOCAL_USB_DIR = LOCAL_USB_DIR_STL.clone().applyQuaternion(MESH_CORRECTION_QUAT);
 const LOCAL_LED_DIR = LOCAL_LED_DIR_STL.clone().applyQuaternion(MESH_CORRECTION_QUAT);
 
-// World-frame meaning of each direction code, from the viewer's perspective
-// in the 3D scene: +Y is up, +X is the viewer's right, +Z points out of the
-// screen toward the viewer ("front").
+// World-frame meaning of each direction code. The scene is viewed over the
+// user's shoulder: +Y is up, +X is the user's (and viewer's) right, and +Z
+// points out of the screen — behind the user, who faces into the screen.
 const WORLD_DIRS: Record<string, THREE.Vector3> = {
   u: new THREE.Vector3(0, 1, 0),
   d: new THREE.Vector3(0, -1, 0),
   l: new THREE.Vector3(-1, 0, 0),
   r: new THREE.Vector3(1, 0, 0),
-  f: new THREE.Vector3(0, 0, 1),
-  b: new THREE.Vector3(0, 0, -1),
+  f: new THREE.Vector3(0, 0, -1),
+  b: new THREE.Vector3(0, 0, 1),
 };
+
+// The streamed IMU axes are already in the user's frame — the firmware
+// rotates them by the same USB/LED orientation config — so they don't depend
+// on the rest pose. In scene terms: sensor x is up/down (world Y), sensor y
+// is left/right (world X), sensor z is out of the screen (world Z).
+// SENSOR_TO_WORLD[i] is the world axis (0 = X, 1 = Y, 2 = Z) sensor axis i
+// lies along.
+const SENSOR_TO_WORLD: Triple = [1, 0, 2];
+// Rotation sense of each sensor gyro axis (+1 = right-hand rule about the
+// world axis above). Confirmed against the device: every axis reads positive
+// for the opposite (left-hand) sense, in every USB/LED orientation.
+const GYRO_SIGN: Triple = [-1, -1, -1];
 
 // Build the quaternion that rotates the STL's local axes so the USB port and
 // LED point the directions the device's orientation config says they should,
@@ -172,24 +184,36 @@ function disposeTree(root: THREE.Object3D, keep: Set<unknown>) {
 // Reused for every sample to avoid allocating a Vector3/Quaternion per sample.
 const deltaRotVec = new THREE.Vector3();
 const deltaQuat = new THREE.Quaternion();
+const restInvQuat = new THREE.Quaternion();
+const accDelta: Triple = [0, 0, 0];
+const accWorld = new THREE.Vector3();
 
-// Integrate body-frame angular velocity as a quaternion rotation rather than
-// summing independent Euler angles — Euler axes aren't orthogonal once more
-// than one axis is active (each later axis in the rotation order inherits a
-// tilt from whatever the earlier axes have already accumulated), which warps
-// the apparent rotation axis over time. Composing a small quaternion per
-// sample and right-multiplying it onto the current orientation (i.e. applying
-// it in the device's own local frame, matching how gyro data is measured)
-// avoids that entirely.
-function applyGyro(device: THREE.Object3D, gyro: Triple) {
-  deltaRotVec.set(
-    THREE.MathUtils.degToRad(-gyro[0] / SAMPLE_RATE_HZ),
-    THREE.MathUtils.degToRad(gyro[1] / SAMPLE_RATE_HZ),
-    THREE.MathUtils.degToRad(-gyro[2] / SAMPLE_RATE_HZ),
+// Fills `out` with sensor vector `v` (gyro or acc) expressed in world axes.
+function sensorToWorld(v: Triple, out: THREE.Vector3, sign: Triple = [1, 1, 1]) {
+  out.set(0, 0, 0);
+  for (let i = 0; i < 3; i++) out.setComponent(SENSOR_TO_WORLD[i], sign[i] * v[i]);
+  return out;
+}
+
+// Integrate angular velocity as a quaternion rotation rather than summing
+// independent Euler angles, which warps the apparent rotation axis once more
+// than one axis is active.
+//
+// The firmware's fixed orientation rotation puts the gyro in the user's head
+// frame: aligned with the world axes at rest, but turning with the head. So
+// the model's orientation is H · R, where R is the rest pose and H the head's
+// rotation so far, and each sample's small rotation Δ (head-frame) updates
+// H → H · Δ. In terms of the model's own quaternion that is
+// q → H · Δ · R = q · (R⁻¹ · Δ · R).
+function applyGyro(device: THREE.Object3D, gyro: Triple, rest: THREE.Quaternion) {
+  sensorToWorld(gyro, deltaRotVec, GYRO_SIGN).multiplyScalar(
+    THREE.MathUtils.degToRad(1 / SAMPLE_RATE_HZ),
   );
   const angle = deltaRotVec.length();
   if (angle > 0) {
     deltaQuat.setFromAxisAngle(deltaRotVec.normalize(), angle);
+    restInvQuat.copy(rest).invert();
+    deltaQuat.premultiply(restInvQuat).multiply(rest); // R⁻¹ · Δ · R
     device.quaternion.multiply(deltaQuat);
   }
 }
@@ -560,17 +584,18 @@ const GestureVisualizer = ({
           if (pane.frame > due) resetPane(pane);
           for (; pane.frame < due; pane.frame++) {
             const { acc, gyro } = pb.samples[pane.frame];
-            applyGyro(pane.device, gyro);
-            pane.device.position.x += (acc[0] - pb.meanAcc[0]) / 500;
-            pane.device.position.y += (acc[1] - pb.meanAcc[1]) / 500;
-            pane.device.position.z += (acc[2] - pb.meanAcc[2]) / 500;
+            applyGyro(pane.device, gyro, restQuatRef.current);
+            accDelta[0] = acc[0] - pb.meanAcc[0];
+            accDelta[1] = acc[1] - pb.meanAcc[1];
+            accDelta[2] = acc[2] - pb.meanAcc[2];
+            pane.device.position.addScaledVector(sensorToWorld(accDelta, accWorld), 1 / 500);
           }
         } else if (liveIndicesRef.current.includes(i)) {
           // Live: apply every reading that arrived since the last frame, at
           // the device's own pace. Rotation only — with no recording to take
           // a gravity baseline from, double-integrated acceleration would
           // just drift the model off screen.
-          for (const gyro of liveQueueRef.current) applyGyro(pane.device, gyro);
+          for (const gyro of liveQueueRef.current) applyGyro(pane.device, gyro, restQuatRef.current);
         }
         pane.render();
       });
