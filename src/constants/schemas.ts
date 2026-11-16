@@ -375,6 +375,8 @@ export const UI_SCHEMA = (gestureNames: string[]): SchemaNode => {
           "Deg/Sec variance limit for calibration to execute. Low number -> small motion cancels calibration.",
       },
     },
+    gesture_sensitivity: { mode: "hidden" },
+    /*
     gesture_sensitivity: {
       label: "Gesture Sensitivity",
       description:
@@ -407,7 +409,7 @@ export const UI_SCHEMA = (gestureNames: string[]): SchemaNode => {
             "Number of consecutive frames the model must agree on to confirm the gesture. Each must be above 'confidence' value to recognize.",
         },
       },
-    },
+    }, */
   },
   profiles: {
     allowAdd: true,

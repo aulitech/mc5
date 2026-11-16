@@ -189,7 +189,15 @@ Dependabot is configured in
 - security updates, which go to the default branch (`dev`).
 
 Merge them into `dev` once their checks pass, and they ship with the next
-release.
+release. Netlify's deploy preview only runs the typecheck and build, so for a
+major update also run `npm run lint`, `npm test` and `npm run contrast`.
+
+`package.json` has one `overrides` entry, pinning
+`@babel/plugin-transform-runtime` to Babel 7. Nothing installs that package:
+it's an optional peer of `@rolldown/plugin-babel`, itself an optional peer of
+`@vitejs/plugin-react` 6. Left to itself, npm resolves it to Babel 8, which
+clashes with the Babel 7 that Workbox (`vite-plugin-pwa`) uses, and the
+install fails. Remove the override once `npm install` works without it.
 
 ## Reporting security issues
 
