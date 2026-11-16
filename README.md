@@ -21,7 +21,7 @@ Updates** returns 404 there. To test it locally, run `npx netlify dev` with
 
 The pre-commit hook runs typecheck, lint, tests and the contrast check.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → `dev` → `main` workflow, version
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the branch → `preview` → `main` workflow, version
 bumps and Netlify deploys.
 
 ## Installing as an app (PWA)
@@ -37,7 +37,7 @@ the connection to Cato.
 
 ## Deployment (Netlify)
 
-Netlify builds from `netlify.toml` (`npm run build`, publishes `dist`). Pushes to `main` deploy to production, `dev` has a branch deploy, and pull
+Netlify builds from `netlify.toml` (`npm run build`, publishes `dist`). Pushes to `main` deploy to production, `preview` has a branch deploy, and pull
 requests get deploy previews (see [CONTRIBUTING.md](CONTRIBUTING.md#netlify-deployments)).
 
 One-time setup in the Netlify UI:

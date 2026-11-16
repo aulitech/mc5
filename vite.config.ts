@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Netlify sets CONTEXT for its builds: "production" (main), "branch-deploy"
-  // (dev) or "deploy-preview" (PRs). Unset in local builds, which act as
+  // (preview) or "deploy-preview" (PRs). Unset in local builds, which act as
   // production.
   const { CONTEXT = 'production' } = loadEnv(mode, '.', '')
   const offlineApp = CONTEXT === 'production'
