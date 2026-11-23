@@ -49,16 +49,16 @@ mc5/                # MyCato — React app (Vite + TypeScript, strict; no .jsx)
 ```
 
 ### Branches
-- **`dev`** — default branch. Every change is a branch off `dev` (`feature/…`, `fix/…`, `docs/…`) merged back through a PR, which gets a Netlify deploy preview; never commit to `dev` directly. Dependabot PRs land here too.
-- **`main`** — production: Netlify deploys it to mc.AULI.TECH. Changes reach it only through a `dev` → `main` PR at release time.
-- Versions: one patch bump per branch merged into `dev`, minor bump (on a `release/X.Y.0` branch) when releasing to `main`. Details in CONTRIBUTING.md.
+- **`preview`** — default branch. Every change is a branch off `preview` (`feature/…`, `fix/…`, `docs/…`) merged back through a PR, which gets a Netlify deploy preview; never commit to `preview` directly. Dependabot PRs land here too.
+- **`main`** — production: Netlify deploys it to mc.AULI.TECH. Changes reach it only through a `preview` → `main` PR at release time.
+- Versions: one patch bump per branch merged into `preview`, minor bump (on a `release/X.Y.0` branch) when releasing to `main`. Details in CONTRIBUTING.md.
 
 ### Key Concepts
 - **Device layer** — `device/ota.ts` owns the HID connection. `send()` calls are queued (never "Send in progress"); status/sensor/practice reports are events (`useOtaEvent`). It holds no config.
 - **DeviceContext / ConfigContext** — device + status vs. config data. `setConfigValue` edits locally; `updateConfig` edits and sends, rolling back if the device rejects it.
 - **Indices in the config** — action bindings point into `action_list` and `profile_map` into `profiles`. Delete actions with `deleteAction` and profiles with `deleteConfigItem`, which re-point them; don't splice those arrays directly.
 - **Recursive tree rendering** — components in `tree/` render JSON nodes recursively from `UI_SCHEMA(gestureNames)`.
-- **PWA** — vite-plugin-pwa (config in vite.config.ts) precaches the whole build, so files in `public/` and the build output are available offline; `/api/*` is never cached. The service worker exists only in production builds (`npm run build && npm run preview`), not in `npm run dev`. Netlify branch deploys and deploy previews (`CONTEXT` ≠ production) get a self-destroying worker instead, so the login-protected `dev`/preview deploys never serve a stale cache.
+- **PWA** — vite-plugin-pwa (config in vite.config.ts) precaches the whole build, so files in `public/` and the build output are available offline; `/api/*` is never cached. The service worker exists only in production builds (`npm run build && npm run preview`), not in `npm run dev`. Netlify branch deploys and deploy previews (`CONTEXT` ≠ production) get a self-destroying worker instead, so the login-protected `preview`/preview deploys never serve a stale cache.
 - **Errors and confirmations** — use `notify` (lib/notify.ts) and `useDialog()`, not `alert`/`confirm`/`prompt`.
 - **Colours** — use the theme tokens in `styles/index.css` (each has a light and a dark value), never hex literals in components. `npm run contrast` checks every token pairing against WCAG (4.5:1 text, 3:1 UI); add a pair to `scripts/contrast-audit.mjs` for any new combination.
 - **Checks** — `npm run typecheck`, `npm run lint`, `npm test`, `npm run contrast` (all in the pre-commit hook); `npm run build` runs the typecheck first. Component tests use jsdom (`// @vitest-environment jsdom`); IndexedDB tests use `fake-indexeddb`.

@@ -4,12 +4,12 @@
 
 | Branch | Purpose | Deploys to |
 | ------ | ------- | ---------- |
-| `dev`  | Default branch. Every change and Dependabot PR lands here through a PR. | Netlify branch deploy, `https://dev--auli-mc.netlify.app` |
-| `main` | Production. Changes arrive only through a `dev` → `main` PR at release time. | `https://mc.AULI.TECH` |
-| `feature/…`, `fix/…`, `docs/…`, `release/…` | One change each, branched off `dev`. | Netlify deploy preview of its PR |
+| `preview`  | Default branch. Every change and Dependabot PR lands here through a PR. | Netlify branch deploy, `https://preview--auli-mc.netlify.app` |
+| `main` | Production. Changes arrive only through a `preview` → `main` PR at release time. | `https://mc.AULI.TECH` |
+| `feature/…`, `fix/…`, `docs/…`, `release/…` | One change each, branched off `preview`. | Netlify deploy preview of its PR |
 
-Don't commit directly to `dev` or `main`. Only `dev` opens PRs into `main`,
-and `dev` is never deleted.
+Don't commit directly to `preview` or `main`. Only `preview` opens PRs into `main`,
+and `preview` is never deleted.
 
 ## Setup
 
@@ -19,20 +19,20 @@ talks to Cato over WebHID.
 ```bash
 git clone https://github.com/aulitech/mc5.git
 cd mc5
-git checkout dev
+git checkout preview
 npm install        # also installs the pre-commit hook
 npm run dev        # Vite dev server at http://localhost:5173
 ```
 
 ## Making a change
 
-Every change goes on its own branch off `dev` and reaches `dev` through a
+Every change goes on its own branch off `preview` and reaches `preview` through a
 PR. The PR is what gets Netlify to build a deploy preview of the change.
 
-1. Branch off an up-to-date `dev`:
+1. Branch off an up-to-date `preview`:
 
    ```bash
-   git checkout dev && git pull
+   git checkout preview && git pull
    git checkout -b feature/short-name   # or fix/…, docs/…
    ```
 
@@ -40,18 +40,18 @@ PR. The PR is what gets Netlify to build a deploy preview of the change.
 3. Bump the patch version once for the branch (see
    [Version bumps](#version-bumps)).
 4. Commit. The pre-commit hook runs every check (see [Testing](#testing)).
-5. Push the branch and open a PR **into `dev`**:
+5. Push the branch and open a PR **into `preview`**:
 
    ```bash
    git push -u origin feature/short-name
-   gh pr create --base dev
+   gh pr create --base preview
    ```
 
 6. Netlify builds a deploy preview for the PR, at
    `https://deploy-preview-<PR number>--auli-mc.netlify.app`, and rebuilds it
    on every push. Try the change there.
 7. Merge the PR with a merge commit. The feature branch can be deleted;
-   `dev` can't. Netlify then rebuilds the `dev` branch deploy.
+   `preview` can't. Netlify then rebuilds the `preview` branch deploy.
 
 Project conventions are in [CLAUDE.md](CLAUDE.md) under "Key Concepts", for
 example how to handle errors and confirmations, theme colour tokens, and
@@ -85,7 +85,7 @@ them fails. Don't skip it with `--no-verify`.
 - **PWA and offline**: the service worker exists only in production builds,
   not under `npm run dev`. To test installing, offline use or the update
   prompt, run `npm run build && npm run preview` (http://localhost:4173).
-  Only Netlify's production deploy is an offline app. The `dev` branch
+  Only Netlify's production deploy is an offline app. The `preview` branch
   deploy and PR previews ship a worker that clears its cache and removes
   itself, so they always load the latest build (see
   [vite.config.ts](vite.config.ts)).
@@ -99,13 +99,13 @@ them fails. Don't skip it with `--no-verify`.
 - **Netlify Functions**: `npm run dev` doesn't serve the functions
   (`/api/releases`, `/api/asset`), so **Manage → Check for Updates** returns
   404 there. To test them locally, run `npx netlify dev` with `GITHUB_TOKEN`
-  set, or use the `dev` branch deploy.
+  set, or use the `preview` branch deploy.
 
 ## Version bumps
 
 The version in `package.json` follows two rules:
 
-- **Every change merged into `dev` bumps the patch version** (1.1.0 →
+- **Every change merged into `preview` bumps the patch version** (1.1.0 →
   1.1.1). Bump once per branch, in its first commit; later commits on the
   same branch don't bump again:
 
@@ -115,45 +115,45 @@ The version in `package.json` follows two rules:
   git commit
   ```
 
-  If another PR bumped `dev` first, merge `dev` into your branch and take
+  If another PR bumped `preview` first, merge `preview` into your branch and take
   the next patch number when resolving the `package.json` conflict.
 
-- **Every release (`dev` → `main`) bumps the minor version** (1.1.4 →
+- **Every release (`preview` → `main`) bumps the minor version** (1.1.4 →
   1.2.0) and resets the patch to 0. The bump goes through its own
-  `release/X.Y.0` branch and PR into `dev`, just before the release PR (see
+  `release/X.Y.0` branch and PR into `preview`, just before the release PR (see
   below). Don't patch-bump that branch as well.
 
 Deployed versions reach installed and open copies of the app through the
 service worker's "new version available" prompt.
 
-Dependabot PRs merged into `dev` on GitHub don't get a bump. They ship with
+Dependabot PRs merged into `preview` on GitHub don't get a bump. They ship with
 the next release.
 
 ## Releasing to production
 
-1. With everything for the release merged into `dev`, check the `dev`
+1. With everything for the release merged into `preview`, check the `preview`
    branch deploy, including hardware checks where they apply.
-2. Bump the minor version on a release branch and merge it into `dev`:
+2. Bump the minor version on a release branch and merge it into `preview`:
 
    ```bash
-   git checkout dev && git pull
+   git checkout preview && git pull
    git checkout -b release/X.Y.0
    npm run bump-minor
    git commit -m "Bump version to X.Y.0"
    git push -u origin release/X.Y.0
-   gh pr create --base dev     # then merge it
+   gh pr create --base preview     # then merge it
    ```
 
-3. Open a PR from `dev` into `main`:
-   `gh pr create --base main --head dev`.
+3. Open a PR from `preview` into `main`:
+   `gh pr create --base main --head preview`.
 4. Wait for the Netlify deploy preview check to pass, and try the preview.
-5. Merge with a **merge commit** and keep `dev`:
+5. Merge with a **merge commit** and keep `preview`:
    `gh pr merge <number> --merge` (no `--delete-branch`).
 6. Netlify deploys `main` to production. Check that
    `https://mc.AULI.TECH` serves it: the response header should name
    Netlify, not `GitHub.com` (see the README's one-time DNS setup).
 
-After the merge, `main` is one merge commit ahead of `dev`. That's expected
+After the merge, `main` is one merge commit ahead of `preview`. That's expected
 and needs no action.
 
 ## Netlify deployments
@@ -165,10 +165,10 @@ Netlify builds every deploy from [netlify.toml](netlify.toml):
 | Context | Built from | URL | Access |
 | ------- | ---------- | --- | ------ |
 | Production | `main` | `https://mc.AULI.TECH` (also `auli-mc.netlify.app`) | Public |
-| Branch deploy | `dev` | `https://dev--auli-mc.netlify.app` | Netlify team login |
-| Deploy preview | Each open PR (feature branch → `dev`, or `dev` → `main`) | `https://deploy-preview-<PR number>--auli-mc.netlify.app` | Netlify team login |
+| Branch deploy | `preview` | `https://preview--auli-mc.netlify.app` | Netlify team login |
+| Deploy preview | Each open PR (feature branch → `preview`, or `preview` → `main`) | `https://deploy-preview-<PR number>--auli-mc.netlify.app` | Netlify team login |
 
-- **When builds run**: every push to `dev` updates the branch deploy, and
+- **When builds run**: every push to `preview` updates the branch deploy, and
   every push to a PR updates its preview. Only merging into `main` changes
   production.
 - **Access**: the non-production deploys are password-protected, so log in
@@ -183,12 +183,12 @@ Netlify builds every deploy from [netlify.toml](netlify.toml):
 
 Dependabot is configured in
 [.github/dependabot.yml](.github/dependabot.yml) and opens PRs against
-`dev`:
+`preview`:
 
 - weekly version updates, with minor and patch updates grouped into one PR;
-- security updates, which go to the default branch (`dev`).
+- security updates, which go to the default branch (`preview`).
 
-Merge them into `dev` once their checks pass, and they ship with the next
+Merge them into `preview` once their checks pass, and they ship with the next
 release. Netlify's deploy preview only runs the typecheck and build, so for a
 major update also run `npm run lint`, `npm test` and `npm run contrast`.
 
