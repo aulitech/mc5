@@ -130,26 +130,29 @@ const CatoCommands = ({ onCheckForUpdates }: { onCheckForUpdates: () => Promise<
             }}
           >
             <ul role="menu" style={{ listStyle: "none", margin: 0, padding: 0 }}>
-              {menuItems.map((item, i) => (
-                <li key={item.label} role="none">
-                  <button
-                    role="menuitem"
-                    className="btn-ghost"
-                    autoFocus={i === 0}
-                    onClick={() => choose(item)}
-                    style={{
-                      marginBottom: "0.1rem",
-                      width: "100%",
-                      padding: "0.5rem 1rem",
-                      cursor: "pointer",
-                      justifyContent: "flex-start",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                </li>
-              ))}
+              {/* Nothing to back up while the configuration couldn't be read. */}
+              {menuItems
+                .filter((item) => item.label !== "Backup" || data)
+                .map((item, i) => (
+                  <li key={item.label} role="none">
+                    <button
+                      role="menuitem"
+                      className="btn-ghost"
+                      autoFocus={i === 0}
+                      onClick={() => choose(item)}
+                      style={{
+                        marginBottom: "0.1rem",
+                        width: "100%",
+                        padding: "0.5rem 1rem",
+                        cursor: "pointer",
+                        justifyContent: "flex-start",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {item.label}
+                    </button>
+                  </li>
+                ))}
             </ul>
           </div>
         )}

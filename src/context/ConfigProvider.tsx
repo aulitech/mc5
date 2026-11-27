@@ -43,24 +43,31 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // ── Load / clear with the connection ───────────────────────────────────────
-  useOtaEvent("connect", async () => {
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // A configuration that can't be read in full isn't shown at all (editing
+  // or backing up part of it would be misleading). Cato stays connected, so
+  // the Manage menu can update its firmware or restore a backup.
+  const loadConfig = useCallback(async () => {
+    setLoadError(null);
     try {
       const { config, unreadProfile } = await ota.readConfig();
       if (!ota.isConnected()) return; // disconnected while loading
+      if (unreadProfile !== undefined) throw new Error(`Profile ${unreadProfile + 1} couldn't be read.`);
       reset(config);
-      if (unreadProfile !== undefined) {
-        notify.error(
-          `Couldn't read profile ${unreadProfile + 1} from Cato, so it and any after it aren't shown. ` +
-            "Reconnect before making a backup.",
-        );
-      }
     } catch (err) {
-      notify.error(`Couldn't read Cato's configuration: ${errorMessage(err)}`);
-      ota.close().catch(() => {});
+      if (!ota.isConnected()) return;
+      console.error("Couldn't read Cato's configuration:", err);
+      reset(null);
+      setLoadError(errorMessage(err));
     }
-  });
+  }, [reset]);
 
-  useOtaEvent("disconnect", () => reset(null));
+  useOtaEvent("connect", loadConfig);
+  useOtaEvent("disconnect", () => {
+    reset(null);
+    setLoadError(null);
+  });
 
   // ── Device sync ────────────────────────────────────────────────────────────
   const sync = useCallback(
@@ -182,6 +189,9 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
         return;
       }
       const deviceProfileCount = syncedRef.current?.profiles.length ?? 0;
+      // Restoring over a configuration that couldn't be read: read it back
+      // afterwards, which shows it if the backup fixed it.
+      const wasUnread = localRef.current === null;
       update(() => config);
 
       const parts: ConfigPath[] = [["global_info"], ...config.profiles.map((_, i) => ["profiles", i])];
@@ -201,8 +211,9 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
       } else {
         notify.success("Configuration restored. Save it to keep it after a reboot.");
       }
+      if (wasUnread) await loadConfig();
     },
-    [update, sync],
+    [update, sync, loadConfig],
   );
 
   const saveConfig = useCallback(async () => {
@@ -226,8 +237,21 @@ export const ConfigProvider = ({ children }: { children: ReactNode }) => {
       deleteAction,
       replaceConfig,
       saveConfig,
+      loadError,
+      reloadConfig: loadConfig,
     }),
-    [data, setConfigValue, updateConfig, addConfigItem, deleteConfigItem, deleteAction, replaceConfig, saveConfig],
+    [
+      data,
+      setConfigValue,
+      updateConfig,
+      addConfigItem,
+      deleteConfigItem,
+      deleteAction,
+      replaceConfig,
+      saveConfig,
+      loadError,
+      loadConfig,
+    ],
   );
 
   return <ConfigContext.Provider value={value}>{children}</ConfigContext.Provider>;
