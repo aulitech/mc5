@@ -3,6 +3,13 @@ import type { Config, ConfigAction, ConfigPath } from "../types/config";
 
 export interface ConfigContextValue {
   data: Config | null;
+  /**
+   * Why Cato's configuration couldn't be read (all of it), while it's
+   * connected; `data` is then null. Null otherwise.
+   */
+  loadError: string | null;
+  /** Read the configuration from Cato again, e.g. after loadError. */
+  reloadConfig: () => Promise<void>;
   actionList: ConfigAction[];
   actionNames: string[];
   /** Change the local copy only — for drafts like typing or dragging a slider. */

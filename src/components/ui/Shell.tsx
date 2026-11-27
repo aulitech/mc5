@@ -53,7 +53,7 @@ const isBrowserSupported = "hid" in navigator && "showOpenFilePicker" in window;
 
 const Shell = () => {
   const { device, status, isConnecting, isReconnecting, connect } = useDevice();
-  const { data, saveConfig } = useConfig();
+  const { data, loadError, reloadConfig, saveConfig } = useConfig();
   const { theme, setTheme, isAdvanced, setIsAdvanced, showExperimental, setShowExperimental } =
     useSettings();
   const [activeTab, setActiveTab] = useState("General");
@@ -78,6 +78,25 @@ const Shell = () => {
       notify.error(`Couldn't check for updates: ${errorMessage(err)}`);
     }
   };
+
+  // While connecting, and while the configuration loads.
+  const connecting = (
+    <VStack
+      style={{
+        gap: "1rem",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <h3>Select a device to connect from the pop-up.</h3>
+      <p />
+      <p>After selecting, the configuration will load in a few seconds.</p>
+      <p />
+      <div>
+        <Ring color="var(--led-blue)" />
+      </div>
+    </VStack>
+  );
 
   const visibleTabs = TABS.filter((t) => !t.experimental || (isAdvanced && showExperimental));
   const currentTab = visibleTabs.find((t) => t.id === activeTab) ?? visibleTabs[0];
@@ -123,24 +142,38 @@ const Shell = () => {
       {/* BROWSER FEATURE & LOADING WARNING */}
       {!isBrowserSupported ? (
         <NoHID />
-      ) : isConnecting || (device && !data) ? (
+      ) : isConnecting ? (
+        connecting
+      ) : update ? (
+        <Update release={update} onClose={() => setUpdate(null)} />
+      ) : device && loadError ? (
+        // Connected, but its configuration couldn't be read: no tabs, just the
+        // header's Manage menu, and a prompt to update the firmware.
         <VStack
           style={{
             gap: "1rem",
             justifyContent: "center",
             alignItems: "center",
+            maxWidth: "36rem",
+            padding: "0 1rem",
+            textAlign: "center",
           }}
         >
-          <h3>Select a device to connect from the pop-up.</h3>
-          <p />
-          <p>After selecting, the configuration will load in a few seconds.</p>
-          <p />
-          <div>
-            <Ring color="var(--led-blue)" />
-          </div>
+          <h3>Cato's configuration couldn't be read</h3>
+          <p style={{ margin: 0, color: "var(--color-muted)" }}>{loadError}</p>
+          <p style={{ margin: 0 }}>
+            This usually means Cato's firmware needs updating. Update it, or use the Manage menu to restore a
+            backup or reset Cato.
+          </p>
+          <HStack style={{ gap: "1rem" }}>
+            <button className="btn-primary" onClick={checkForUpdates}>
+              Update firmware
+            </button>
+            <button onClick={reloadConfig}>Try again</button>
+          </HStack>
         </VStack>
-      ) : update ? (
-        <Update release={update} onClose={() => setUpdate(null)} />
+      ) : device && !data ? (
+        connecting
       ) : isReconnecting ? (
         <VStack
           style={{
