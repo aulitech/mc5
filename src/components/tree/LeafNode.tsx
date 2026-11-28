@@ -2,6 +2,7 @@ import { useState, type KeyboardEvent } from "react";
 import { useConfig } from "../../context/ConfigContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { SchemaNode } from "../../constants/schemas";
+import { isShown } from "../../utils/schema";
 import { SLIDER_KEYS, clampToRange, textToLeafValue, type NumberRange } from "../../lib/leafValue";
 import type { ConfigPath } from "../../types/config";
 import styles from "./Tree.module.css";
@@ -24,13 +25,13 @@ const commitKeys =
 
 const LeafNode = ({ name, value, path, schema }: LeafNodeProps) => {
   const { setConfigValue, updateConfig, actionList } = useConfig();
-  const { isAdvanced } = useSettings();
+  const settings = useSettings();
 
   // Text being typed into an input, not yet sent. Sent on Enter or blur, so
   // a half-typed value (e.g. "0." or the "1" of "150") never reaches Cato.
   const [draft, setDraft] = useState<string | null>(null);
 
-  if (schema?.mode === "hidden" || (schema?.mode === "advanced" && !isAdvanced)) {
+  if (!isShown(schema, settings)) {
     return null;
   }
 

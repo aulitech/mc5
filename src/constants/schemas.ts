@@ -16,7 +16,8 @@ export interface SchemaOption {
 export interface SchemaNode {
   label?: string;
   description?: string;
-  mode?: "hidden" | "advanced" | "basic";
+  /** advanced: Advanced on; experimental: Advanced and Experimental on. */
+  mode?: "hidden" | "advanced" | "experimental" | "basic";
   readOnly?: boolean;
   type?: "action_binding";
   options?: SchemaOption[];
@@ -331,7 +332,7 @@ export const UI_SCHEMA = (gestureNames: string[]): SchemaNode => {
     },
     orientation: {
       label: "Orientation",
-      mode: "advanced",
+      mode: "experimental",
       usb: {
         label: "USB Direction",
         options: ORIENTATION_OPTS,
