@@ -23,3 +23,20 @@ export function getSchema(path: ConfigPath, gestureNames: string[]): SchemaNode 
   }
   return current ?? null;
 }
+
+/** Whether a schema node is shown, given the Advanced and Experimental switches. */
+export function isShown(
+  schema: SchemaNode | null | undefined,
+  { isAdvanced, showExperimental }: { isAdvanced: boolean; showExperimental: boolean },
+): boolean {
+  switch (schema?.mode) {
+    case "hidden":
+      return false;
+    case "advanced":
+      return isAdvanced;
+    case "experimental":
+      return isAdvanced && showExperimental;
+    default:
+      return true;
+  }
+}
