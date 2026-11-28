@@ -1,7 +1,7 @@
 import { useState } from "react";
 import RadioGroup from "../tools/RadioGroup";
 import ota from "../../device/ota";
-import { downloadBlob, saveWithPicker } from "../../lib/configFile";
+import { downloadBlob, isAbort } from "../../lib/configFile";
 import { errorMessage, notify } from "../../lib/notify";
 import { fetchFirmwareAsset, type Release, type ReleaseAsset } from "../../lib/releases";
 import { VStack, Ring } from "./Utility";
@@ -30,6 +30,11 @@ const buttonStyle = {
  * 1. Download the chosen .uf2 (no device side effects; can fail safely).
  * 2. Install: reboot Cato into its USB update drive, then save the file onto
  *    it. Each step is its own click, which the save dialog requires.
+ * Cato installs the firmware and restarts as soon as it has the whole file,
+ * which can be before the browser has finished writing it, so the write
+ * often ends in an error. Once the file is being written, that counts as
+ * installed: the update screen closes on the "Cato is restarting" screen,
+ * whose Reconnect picks Cato up again.
  */
 const Update = ({ release, onClose }: UpdateProps) => {
   const [asset, setAsset] = useState<ReleaseAsset | undefined>(release.assets[0]);
@@ -60,19 +65,33 @@ const Update = ({ release, onClose }: UpdateProps) => {
       onClose();
       return;
     }
+    let writable: FileSystemWritableFileStream;
     try {
-      if (await saveWithPicker(firmware, asset.name, UF2_TYPES)) {
-        notify.success("Firmware sent. Cato will reboot and pair in about 30 seconds.");
-        onClose();
-      } else {
+      const handle = await window.showSaveFilePicker({ suggestedName: asset.name, types: UF2_TYPES });
+      writable = await handle.createWritable();
+    } catch (err) {
+      if (isAbort(err)) {
         notify.info(
           "Cato is in update mode. Press Install again, drag the file onto the AULI-UPDAT drive, or unplug Cato to cancel.",
         );
+      } else {
+        // Nothing reached Cato.
+        console.error("SaveFilePicker error:", err);
+        notify.error(`Couldn't save the firmware to Cato: ${errorMessage(err)}`);
       }
-    } catch (err) {
-      console.error("SaveFilePicker error:", err);
-      notify.error(`Couldn't save the firmware to Cato: ${errorMessage(err)}`);
+      return;
     }
+    try {
+      await writable.write(firmware);
+      await writable.close();
+    } catch (err) {
+      // Cato restarted to install it before the browser finished writing.
+      console.warn("Firmware write ended as Cato restarted (expected):", err);
+    }
+    notify.success(
+      "Firmware sent. Cato is installing it and restarts in about 30 seconds: click Reconnect when it's back.",
+    );
+    onClose();
   };
 
   return (
