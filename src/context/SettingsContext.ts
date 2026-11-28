@@ -7,7 +7,7 @@ export interface SettingsContextValue {
   setTheme: (theme: Theme) => void;
   isAdvanced: boolean;
   setIsAdvanced: (on: boolean) => void;
-  /** Shows experimental tabs (currently Gestures); only offered in advanced mode. */
+  /** Shows experimental features (the Gestures tab, Orientation settings); only offered in advanced mode. */
   showExperimental: boolean;
   setShowExperimental: (on: boolean) => void;
 }

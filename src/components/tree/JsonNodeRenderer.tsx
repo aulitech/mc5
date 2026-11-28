@@ -6,7 +6,7 @@ import { useDevice } from "../../context/DeviceContext";
 import { useSettings } from "../../context/SettingsContext";
 import type { SchemaNode } from "../../constants/schemas";
 import type { ConfigPath } from "../../types/config";
-import { getSchema } from "../../utils/schema";
+import { getSchema, isShown } from "../../utils/schema";
 import AccelerationEditor, { type CustomEditorProps } from "../tools/AccelerationEditor";
 
 import styles from "./Tree.module.css";
@@ -25,7 +25,7 @@ interface JsonNodeRendererProps {
 
 const JsonNodeRenderer = ({ name, data, path, isRootItem }: JsonNodeRendererProps) => {
   const { addConfigItem, deleteConfigItem } = useConfig();
-  const { isAdvanced } = useSettings();
+  const settings = useSettings();
   const { gestureNames } = useDevice();
 
   const [isCollapsed, setIsCollapsed] = useState(!isRootItem && path.length > 2);
@@ -35,7 +35,7 @@ const JsonNodeRenderer = ({ name, data, path, isRootItem }: JsonNodeRendererProp
   const label = currentSchema?.label || name;
   const description = currentSchema?.description;
 
-  if (currentSchema?.mode === "hidden" || (currentSchema?.mode === "advanced" && !isAdvanced)) {
+  if (!isShown(currentSchema, settings)) {
     return null;
   }
 
