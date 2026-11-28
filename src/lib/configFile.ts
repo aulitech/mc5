@@ -7,7 +7,7 @@ const JSON_TYPES: FilePickerAcceptType[] = [
   { description: "JSON Files", accept: { "application/json": [".json"] } },
 ];
 
-const isAbort = (err: unknown) => err instanceof DOMException && err.name === "AbortError";
+export const isAbort = (err: unknown) => err instanceof DOMException && err.name === "AbortError";
 
 /**
  * Let the user pick a config JSON file and return its parsed contents
